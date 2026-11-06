@@ -8,6 +8,7 @@ android/local.properties
 dist/*.apk
 dist/*.pkt
 dist/pocket-host.json
+dist/.pocket-server.json
 dist/.pocket-server*.log
 library/
 
