@@ -121,7 +121,7 @@ fun AiSettingsSheet(
             }
             testing = false
             result.fold(
-                onSuccess = { testOk = true; testResult = "连接正常：${it.take(40)}" },
+                onSuccess = { testOk = true; testResult = "连接正常：${it.text.take(40)}" },
                 onFailure = { testOk = false; testResult = it.message ?: "连接失败" }
             )
         }

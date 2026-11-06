@@ -1,6 +1,7 @@
 package io.pocket.host.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,10 +56,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private data class ChatMessage(val role: String, val content: String)
+private data class ChatMessage(val role: String, val content: String, val reasoning: String = "")
 
 private const val SYSTEM_PROMPT =
-    "你是装在手机里的口袋 AI 助手。回答简洁、准确、可执行；默认用简体中文；" +
+    "你是装在手机里的口袋 AI 助手。只输出最终回答，不要输出思考过程、草稿或推理步骤；" +
+        "回答简洁、准确、可执行；默认用简体中文；" +
         "不要编造链接或数据；不确定就直说。涉及代码时给最小可运行片段。"
 
 @Composable
@@ -99,7 +101,9 @@ fun AiChatScreen(
             }
             busy = false
             result.fold(
-                onSuccess = { messages.add(ChatMessage("assistant", it.trim())) },
+                onSuccess = {
+                    messages.add(ChatMessage("assistant", it.text.trim(), it.reasoning.trim()))
+                },
                 onFailure = { error = it.message ?: "调用失败" }
             )
         }
@@ -185,21 +189,54 @@ fun AiChatScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = if (msg.role == "user") Arrangement.End else Arrangement.Start
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .widthIn(max = 320.dp)
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(
-                                    if (msg.role == "user") MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                                )
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        Column(
+                            modifier = Modifier.widthIn(max = 320.dp),
+                            horizontalAlignment = if (msg.role == "user") Alignment.End else Alignment.Start
                         ) {
-                            Text(
-                                text = msg.content,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (msg.role == "user") Color.White else MaterialTheme.colorScheme.onSurface
-                            )
+                            if (msg.role == "assistant" && msg.reasoning.isNotBlank()) {
+                                var open by remember(msg.content) { mutableStateOf(false) }
+                                Text(
+                                    text = if (open) "思考过程 ▾" else "思考过程 ▸",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable { open = !open }
+                                        .padding(horizontal = 8.dp, vertical = 5.dp)
+                                )
+                                if (open) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                                            .padding(horizontal = 12.dp, vertical = 9.dp)
+                                    ) {
+                                        Text(
+                                            text = msg.reasoning,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(
+                                        if (msg.role == "user") MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                            ) {
+                                Text(
+                                    text = msg.content,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (msg.role == "user") Color.White
+                                    else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 }

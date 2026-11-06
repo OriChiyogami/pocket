@@ -311,8 +311,12 @@ class PocketBridge(
                                     hostContext(), messages,
                                     system.ifBlank { null }, temperature, maxTokens
                                 )
-                            }.onSuccess { text ->
-                                resolve(id, true, JSONObject().put("text", text), null)
+                            }.onSuccess { reply ->
+                                resolve(
+                                    id, true,
+                                    JSONObject().put("text", reply.text).put("reasoning", reply.reasoning),
+                                    null
+                                )
                             }.onFailure { e ->
                                 resolve(id, false, null, BridgeException("E_AI", e.message ?: "AI 调用失败"))
                             }

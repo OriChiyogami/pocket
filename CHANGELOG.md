@@ -1,5 +1,11 @@
 # 更新日志
 
+## 1.2.7
+- 电脑端上传入口拆分：拖到「发给手机」只生成手机应用；拖到「本机 HTML 收藏」只存电脑端，两边不再互相串
+- 收藏的 HTML 新增「迁数据」：把原来双击直接打开时存在浏览器里的 localStorage 一次性导入
+- 手机 AI：思考过程与正式回答分开显示（支持 `reasoning_content` / `<thinking>` 块）
+- SDK：新增 `pocket.ai.chatFull()` 返回 `{ text, reasoning }`；`chat()` 仍只返回正文
+
 ## 1.2.6
 - 手机端 AI：设置里配置 DeepSeek（只填 Key）或 OpenAI 兼容中转站；首页右上角「AI」直接提问
 - JS SDK：`pocket.ai.chat` / `ask` / `status`，应用统一调用宿主模型，不用各自配 Key

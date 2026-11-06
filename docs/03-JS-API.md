@@ -334,6 +334,11 @@ const reply = await pocket.ai.chat({
 ### `pocket.ai.ask(prompt, system?): Promise<string>`
 `chat` 的简写版。
 
+### `pocket.ai.chatFull(options): Promise<{ text, reasoning }>`
+需要把「思考过程」和「正式回答」分开时用这个；`chat()` 永远只返回正式回答。
+宿主会自动识别两种来源：接口的 `message.reasoning_content` / `reasoning` / `thinking` 字段，
+以及被塞进正文里的 `<thinking>…</thinking>` 块。
+
 ### `pocket.ai.status(): Promise<{ available, provider, model }>`
 
 ```js

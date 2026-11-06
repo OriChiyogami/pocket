@@ -251,6 +251,7 @@ function renderPage(options) {
         </div>
         <div class="ops">
           <button class="mini text" data-lib-open title="在电脑上打开">打开</button>
+          <button class="mini text" data-lib-migrate title="把旧页面里的数据导进来">迁数据</button>
           <button class="mini text" data-lib-send title="打包并发到手机">发到手机</button>
           <button class="mini text" data-lib-rename title="重命名">✎</button>
           <button class="mini danger" data-lib-rm title="从收藏中删除">✕</button>
@@ -328,6 +329,11 @@ function renderPage(options) {
     transition: all .18s ease;
   }
   .drop.hover { border-color: #7C5CFF; background: rgba(124,92,255,.12); transform: scale(1.01); }
+  .drop.libDrop { margin-top: 12px; padding: 22px 18px; border-color: rgba(34,184,207,.35); background: rgba(34,184,207,.05); }
+  .drop.libDrop.hover { border-color: #0E7490; background: rgba(34,184,207,.12); }
+  .drop.libDrop .dropIcon { width: 44px; height: 44px; margin-bottom: 8px; background: rgba(34,184,207,.14); color: #0E7490; font-size: 18px; font-weight: 800; }
+  .libTip { margin-top: 8px; font-size: 12px; line-height: 1.55; color: #8E89A3; }
+  .libTip code { font-family: ui-monospace, Menlo, monospace; background: rgba(0,0,0,.05); padding: 1px 5px; border-radius: 5px; }
   .dropIcon { width: 54px; height: 54px; margin: 0 auto 12px; border-radius: 50%;
               background: rgba(124,92,255,.13); color: #7C5CFF; display: grid; place-items: center; font-size: 24px; }
   .drop h3 { font-size: 16px; font-weight: 700; }
@@ -414,8 +420,8 @@ function renderPage(options) {
   <label class="drop" id="drop">
     <input type="file" id="fileInput" multiple accept=".pkt,.html,.htm">
     <div class="dropIcon">↑</div>
-    <h3>把 .pkt 拖到这里，或点击选择</h3>
-    <p>.html 会同时收进「本机 HTML 收藏」并自动生成手机应用 · 单文件最大 64MB</p>
+    <h3>发给手机：把 .pkt 或 .html 拖到这里</h3>
+    <p>.html 会自动打包成手机应用；这个入口不会写进电脑端的 HTML 收藏 · 单文件最大 64MB</p>
     <div class="uploadStatus" id="uploadStatus"></div>
   </label>
 
@@ -430,8 +436,18 @@ function renderPage(options) {
   <div class="sectionTitle">
     <h2>本机 HTML 收藏</h2>
     <span class="count" id="libCount">${library.length}</span>
-    <span class="hint">平时在电脑上用的 .html 收在这里，随时打开或发到手机</span>
+    <span class="hint">电脑上自己的 HTML，只在这里管理，不会发到手机</span>
   </div>
+
+  <label class="drop libDrop" id="libDrop">
+    <input type="file" id="libInput" multiple accept=".html,.htm">
+    <div class="dropIcon">H</div>
+    <h3>只收进电脑端收藏：把 .html 拖到这里</h3>
+    <p>可以在电脑上直接打开、改名、随时找回；想给手机用再点「发到手机」 · 单文件最大 64MB</p>
+    <div class="uploadStatus" id="libStatus"></div>
+  </label>
+
+  <p class="libTip">原来直接双击打开这个文件时，数据存在那个页面的浏览器存储里；换到这里打开后点一次「迁数据」，在旧页面按 F12 → 控制台运行 <code>copy(JSON.stringify(localStorage))</code>，把结果粘进来即可。</p>
 
   <div class="grid" id="libGrid">${libraryCards}</div>
 
@@ -440,27 +456,19 @@ function renderPage(options) {
 
 <script>
 (function () {
-  var drop = document.getElementById('drop');
-  var input = document.getElementById('fileInput');
-  var status = document.getElementById('uploadStatus');
   var grid = document.getElementById('grid');
 
-  function setStatus(text, tone) {
-    status.textContent = text;
-    status.style.color = tone === 'error' ? '#E5484D' : '';
-  }
-
-  function uploadOne(file) {
+  function uploadOne(file, target) {
     return new Promise(function (resolve, reject) {
       var kind = /\.html?$/i.test(file.name) ? 'html' : 'pkt';
       var url = '/api/upload?filename=' + encodeURIComponent(file.name) +
-                '&kind=' + kind + '&size=' + file.size;
+                '&kind=' + kind + '&size=' + file.size + '&target=' + target;
       var xhr = new XMLHttpRequest();
       xhr.open('POST', url);
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
       xhr.upload.onprogress = function (e) {
         if (e.lengthComputable) {
-          setStatus('上传 ' + file.name + ' … ' + Math.round(e.loaded / e.total * 100) + '%');
+          setStatus(target, '上传 ' + file.name + ' … ' + Math.round(e.loaded / e.total * 100) + '%');
         }
       };
       xhr.onload = function () {
@@ -477,45 +485,60 @@ function renderPage(options) {
     });
   }
 
-  async function handleFiles(files) {
+  function setStatus(target, text, tone) {
+    var el = document.getElementById(target === 'library' ? 'libStatus' : 'uploadStatus');
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = tone === 'error' ? '#E5484D' : '';
+  }
+
+  async function handleFiles(files, target) {
     if (!files || !files.length) return;
     var list = Array.prototype.slice.call(files);
     for (var i = 0; i < list.length; i++) {
       var f = list[i];
-      if (!/\.(pkt|html?)$/i.test(f.name)) {
-        setStatus('跳过不支持的文件：' + f.name, 'error');
+      var allowed = target === 'library' ? /\.html?$/i.test(f.name) : /\.(pkt|html?)$/i.test(f.name);
+      if (!allowed) {
+        setStatus(target, '跳过不支持的文件：' + f.name, 'error');
         continue;
       }
       try {
-        var res = await uploadOne(f);
-        setStatus('已收录：' + (res.name || f.name));
+        var res = await uploadOne(f, target);
+        setStatus(target, '已收录：' + (res.name || f.name));
       } catch (err) {
-        setStatus(err.message + '：' + f.name, 'error');
+        setStatus(target, err.message + '：' + f.name, 'error');
         return;
       }
     }
-    setStatus('上传完成，刷新中…');
+    setStatus(target, '上传完成，刷新中…');
     setTimeout(function () { location.reload(); }, 400);
   }
 
-  input.addEventListener('change', function () { handleFiles(input.files); });
+  function bindDrop(dropId, inputId, target) {
+    var drop = document.getElementById(dropId);
+    var input = document.getElementById(inputId);
+    if (!drop || !input) return;
+    input.addEventListener('change', function () { handleFiles(input.files, target); });
+    ['dragenter', 'dragover'].forEach(function (name) {
+      drop.addEventListener(name, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        drop.classList.add('hover');
+      });
+    });
+    ['dragleave', 'drop'].forEach(function (name) {
+      drop.addEventListener(name, function (e) {
+        e.preventDefault(); e.stopPropagation();
+        drop.classList.remove('hover');
+      });
+    });
+    drop.addEventListener('drop', function (e) {
+      var dt = e.dataTransfer;
+      if (dt && dt.files) handleFiles(dt.files, target);
+    });
+  }
 
-  ['dragenter', 'dragover'].forEach(function (name) {
-    drop.addEventListener(name, function (e) {
-      e.preventDefault(); e.stopPropagation();
-      drop.classList.add('hover');
-    });
-  });
-  ['dragleave', 'drop'].forEach(function (name) {
-    drop.addEventListener(name, function (e) {
-      e.preventDefault(); e.stopPropagation();
-      drop.classList.remove('hover');
-    });
-  });
-  drop.addEventListener('drop', function (e) {
-    var dt = e.dataTransfer;
-    if (dt && dt.files) handleFiles(dt.files);
-  });
+  bindDrop('drop', 'fileInput', 'phone');
+  bindDrop('libDrop', 'libInput', 'library');
 
   grid.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-del]');
@@ -535,7 +558,7 @@ function renderPage(options) {
   var libGrid = document.getElementById('libGrid');
   if (libGrid) {
     libGrid.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-lib-open],[data-lib-send],[data-lib-rename],[data-lib-rm]');
+      var btn = e.target.closest('[data-lib-open],[data-lib-migrate],[data-lib-send],[data-lib-rename],[data-lib-rm]');
       if (!btn) return;
       var card = btn.closest('[data-lib]');
       var file = card ? card.getAttribute('data-lib') : '';
@@ -543,6 +566,11 @@ function renderPage(options) {
 
       if (btn.hasAttribute('data-lib-open')) {
         window.open('/library/' + encodeURIComponent(file), '_blank');
+        return;
+      }
+
+      if (btn.hasAttribute('data-lib-migrate')) {
+        window.open('/library/' + encodeURIComponent(file) + '?import=1', '_blank');
         return;
       }
 
@@ -754,8 +782,35 @@ function startServer(options) {
           res.end('not found');
           return;
         }
+        // 打开收藏的 HTML 时，额外注入一个「旧数据导入」脚本：
+        // 浏览器的 localStorage 按来源隔离，直接从 file:// 打开的数据不会自动跟过来
+        let html = fs.readFileSync(full, 'utf8');
+        const importScript = `
+<script>
+(function(){
+  if (location.search.indexOf('import=1') === -1) return;
+  var tip = '把旧数据粘贴到这里（原来的 file:// 页面按 F12 → 控制台运行：\\ncopy(JSON.stringify(localStorage))\\n然后把结果粘贴进来）';
+  var text = prompt(tip);
+  if (!text) return;
+  try {
+    var obj = JSON.parse(text);
+    var n = 0;
+    Object.keys(obj).forEach(function (k) { localStorage.setItem(k, String(obj[k])); n++; });
+    alert('已导入 ' + n + ' 项，刷新后生效');
+    location.href = location.pathname;
+  } catch (e) {
+    alert('格式不对：' + e.message);
+  }
+})();
+</script>
+`;
+        if (/<\/body>/i.test(html)) {
+          html = html.replace(/<\/body>/i, importScript + '</body>');
+        } else {
+          html += importScript;
+        }
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-        fs.createReadStream(full).pipe(res);
+        res.end(html);
         return;
       }
 
@@ -805,6 +860,7 @@ function startServer(options) {
       if (pathname === '/api/upload' && req.method === 'POST') {
         const filename = path.basename(url.searchParams.get('filename') || 'upload.pkt');
         const kind = (url.searchParams.get('kind') || '').toLowerCase();
+        const target = (url.searchParams.get('target') || 'phone').toLowerCase();
         const body = await readBody(req);
         if (!body.length) {
           res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -813,20 +869,32 @@ function startServer(options) {
         }
 
         const isHtml = kind === 'html' || /\.html?$/i.test(filename);
+
+        // 入口一：本机 HTML 收藏，只存电脑端，不发给手机
+        if (target === 'library') {
+          if (!isHtml) {
+            res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+            res.end(JSON.stringify({ error: '这个入口只收 .html' }));
+            return;
+          }
+          const safe = sanitizeHtmlName(filename);
+          fs.writeFileSync(path.join(libraryDir, safe), body);
+          res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ ok: true, file: safe, name: safe.replace(/\.html?$/i, '') }));
+          return;
+        }
+
+        // 入口二：发给手机（.pkt 直接收，.html 自动打成应用；不再往收藏里塞）
         let result;
         if (isHtml) {
           result = packHtmlBuffer(dir, body, filename);
-          // 同时收进本机 HTML 收藏，以后在电脑上也能翻到
-          try {
-            fs.writeFileSync(path.join(libraryDir, sanitizeHtmlName(filename)), body);
-          } catch (e) {}
         } else {
           const safe = uniqueFile(dir, slugify(filename.replace(/\.pkt$/i, '')), '.pkt');
-          const target = path.join(dir, safe);
-          fs.writeFileSync(target, body);
-          const info = describePackage(target);
+          const pktPath = path.join(dir, safe);
+          fs.writeFileSync(pktPath, body);
+          const info = describePackage(pktPath);
           if (!info) {
-            fs.unlinkSync(target);
+            fs.unlinkSync(pktPath);
             res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
             res.end(JSON.stringify({ error: '不是有效的 .pkt 包' }));
             return;

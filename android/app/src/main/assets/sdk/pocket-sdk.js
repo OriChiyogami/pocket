@@ -368,6 +368,21 @@
       /** 只要一句话问答的快捷方式 */
       ask: function (prompt, system) {
         return pocket.ai.chat({ prompt: String(prompt == null ? '' : prompt), system: system || '' });
+      },
+
+      /** 想要「正文 + 思考过程」分开时用这个：{ text, reasoning } */
+      chatFull: function (a, b) {
+        var opts = typeof a === 'string' ? { prompt: a } : (a || {});
+        var messages = opts.messages;
+        if (!messages && opts.prompt) messages = [{ role: 'user', content: String(opts.prompt) }];
+        return invoke('ai.chat', {
+          messages: messages || [],
+          system: opts.system || '',
+          temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.7,
+          maxTokens: typeof opts.maxTokens === 'number' ? opts.maxTokens : 0
+        }).then(function (r) {
+          return { text: (r && r.text) || '', reasoning: (r && r.reasoning) || '' };
+        });
       }
     },
 
