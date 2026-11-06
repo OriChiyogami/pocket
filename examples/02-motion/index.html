@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>动效实验室</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --a: #6C4CFF;
+    --b: #22D3EE;
+    --c: #FF5C8A;
+  }
+  html, body { height: 100%; }
+  body {
+    background: #05040A;
+    color: #EDEBF7;
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", system-ui, sans-serif;
+    overflow: hidden;
+    position: relative;
+    user-select: none;
+  }
+
+  /* ---------- 背景光晕 ---------- */
+  .aurora { position: fixed; inset: 0; overflow: hidden; z-index: 0; }
+  .blob {
+    position: absolute; border-radius: 50%;
+    filter: blur(60px); opacity: .55;
+    will-change: transform;
+  }
+  .b1 { width: 62vw; height: 62vw; left: -18vw; top: -12vh; background: radial-gradient(circle, var(--a), transparent 68%); animation: drift1 16s ease-in-out infinite; }
+  .b2 { width: 56vw; height: 56vw; right: -16vw; top: 8vh; background: radial-gradient(circle, var(--b), transparent 68%); animation: drift2 19s ease-in-out infinite; }
+  .b3 { width: 70vw; height: 70vw; left: 12vw; bottom: -26vh; background: radial-gradient(circle, var(--c), transparent 66%); animation: drift3 22s ease-in-out infinite; }
+  @keyframes drift1 { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(8vw,6vh,0) scale(1.12); } }
+  @keyframes drift2 { 0%,100% { transform: translate3d(0,0,0) scale(1.05); } 50% { transform: translate3d(-7vw,10vh,0) scale(.92); } }
+  @keyframes drift3 { 0%,100% { transform: translate3d(0,0,0) scale(1); } 50% { transform: translate3d(-6vw,-8vh,0) scale(1.1); } }
+
+  .noise {
+    position: fixed; inset: 0; z-index: 1; opacity: .35; pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.35'/></svg>");
+    mix-blend-mode: overlay;
+  }
+
+  /* ---------- 顶部 ---------- */
+  .top {
+    position: relative; z-index: 3;
+    padding: calc(var(--pocket-safe-top, 0px) + 18px) 24px 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark {
+    width: 30px; height: 30px; border-radius: 10px;
+    background: conic-gradient(from 0deg, var(--a), var(--b), var(--c), var(--a));
+    animation: spin 8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .brand h1 { font-size: 13px; letter-spacing: 3px; font-weight: 700; opacity: .92; }
+  .pill {
+    font-size: 11px; letter-spacing: .5px; padding: 6px 12px; border-radius: 999px;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12);
+    color: rgba(237,235,247,.75);
+  }
+
+  /* ---------- 主体 ---------- */
+  .stage {
+    position: relative; z-index: 3;
+    height: calc(100vh - 120px);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding-bottom: calc(var(--pocket-safe-bottom, 0px) + 120px + var(--pocket-keyboard, 0px));
+    transition: padding-bottom .28s cubic-bezier(.22,1,.36,1);
+  }
+
+  .orbit {
+    position: relative; width: 240px; height: 240px;
+    display: grid; place-items: center;
+  }
+  .ring {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 0deg, rgba(108,76,255,.0), rgba(108,76,255,.8), rgba(34,211,238,.85), rgba(255,92,138,.8), rgba(108,76,255,0));
+    animation: spin 9s linear infinite;
+    -webkit-mask: radial-gradient(circle, transparent 62%, #000 63%);
+            mask: radial-gradient(circle, transparent 62%, #000 63%);
+    opacity: .9;
+  }
+  .ring2 {
+    position: absolute; inset: -22px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.08);
+    animation: spin 14s linear infinite reverse;
+  }
+  .ring2::after {
+    content: ""; position: absolute; top: -4px; left: 50%;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--b); box-shadow: 0 0 18px var(--b);
+  }
+
+  .core {
+    width: 148px; height: 148px; border-radius: 44px;
+    background: linear-gradient(145deg, rgba(255,255,255,.16), rgba(255,255,255,.04));
+    border: 1px solid rgba(255,255,255,.16);
+    backdrop-filter: blur(18px);
+    display: grid; place-items: center;
+    box-shadow: 0 30px 70px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.25);
+    animation: breathe 5.5s ease-in-out infinite;
+    transform-style: preserve-3d;
+  }
+  @keyframes breathe {
+    0%,100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-10px) scale(1.03); }
+  }
+  .glyph {
+    font-size: 34px; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(120deg, #fff, #9FE8FF 60%, #FFB3CB);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  .caption { margin-top: 46px; text-align: center; }
+  .caption h2 { font-size: 26px; font-weight: 800; letter-spacing: -.8px; }
+  .caption p { margin-top: 8px; font-size: 12.5px; color: rgba(237,235,247,.55); letter-spacing: .6px; }
+
+  .marquee {
+    position: absolute; left: 0; right: 0; bottom: calc(var(--pocket-safe-bottom, 0px) + 168px + var(--pocket-keyboard, 0px));
+    overflow: hidden; white-space: nowrap; opacity: .35;
+    transition: bottom .28s cubic-bezier(.22,1,.36,1);
+  }
+  .marquee span {
+    display: inline-block; padding-left: 100%;
+    font-size: 11px; letter-spacing: 6px;
+    animation: slide 22s linear infinite;
+  }
+  @keyframes slide { to { transform: translateX(-100%); } }
+
+  /* ---------- 底部输入 ---------- */
+  .dock {
+    position: fixed; z-index: 5;
+    left: 20px; right: 20px;
+    bottom: calc(var(--pocket-safe-bottom, 0px) + 22px + var(--pocket-keyboard, 0px));
+    display: flex; gap: 10px;
+    padding: 8px;
+    border-radius: 24px;
+    background: rgba(22,20,32,.72);
+    border: 1px solid rgba(255,255,255,.12);
+    backdrop-filter: blur(20px);
+    transition: bottom .28s cubic-bezier(.22,1,.36,1);
+  }
+  .dock input {
+    flex: 1; border: none; outline: none; background: transparent;
+    color: #EDEBF7; font-size: 15px; font-family: inherit;
+    padding: 10px 14px; min-width: 0;
+  }
+  .dock input::placeholder { color: rgba(237,235,247,.35); }
+  .dock button {
+    border: none; width: 44px; height: 44px; border-radius: 18px;
+    background: linear-gradient(135deg, var(--a), var(--b));
+    color: #fff; font-size: 18px; font-weight: 700;
+    transition: transform .18s ease;
+  }
+  .dock button:active { transform: scale(.92); }
+
+  /* ---------- 粒子 ---------- */
+  .spark {
+    position: fixed; width: 6px; height: 6px; border-radius: 50%;
+    pointer-events: none; z-index: 9;
+    animation: burst .7s cubic-bezier(.16,1,.3,1) forwards;
+  }
+  @keyframes burst {
+    0% { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(.2); }
+  }
+</style>
+</head>
+<body>
+  <div class="aurora">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+  <div class="noise"></div>
+
+  <div class="top">
+    <div class="brand">
+      <div class="mark"></div>
+      <h1>MOTION LAB</h1>
+    </div>
+    <div class="pill" id="themePill">DARK</div>
+  </div>
+
+  <div class="stage">
+    <div class="orbit" id="orbit">
+      <div class="ring"></div>
+      <div class="ring2"></div>
+      <div class="core"><span class="glyph">pocket</span></div>
+    </div>
+
+    <div class="caption">
+      <h2>动效全部跑在 WebView 里</h2>
+      <p>点任意位置产生粒子 · 输入框会跟随键盘上移</p>
+    </div>
+  </div>
+
+  <div class="marquee"><span>SAFE AREA · KEYBOARD INSETS · 60FPS · INDEPENDENT ORIGIN · NATIVE BRIDGE ·</span></div>
+
+  <div class="dock">
+    <input id="input" placeholder="输入点什么，试试键盘适配" />
+    <button id="send">↑</button>
+  </div>
+
+<script>
+  const COLORS = ['#6C4CFF', '#22D3EE', '#FF5C8A', '#9FE8FF'];
+
+  function burst(x, y) {
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 / count) * i + Math.random() * 0.4;
+      const distance = 40 + Math.random() * 90;
+      const spark = document.createElement('div');
+      spark.className = 'spark';
+      spark.style.left = x + 'px';
+      spark.style.top = y + 'px';
+      spark.style.background = COLORS[i % COLORS.length];
+      spark.style.boxShadow = '0 0 12px ' + COLORS[i % COLORS.length];
+      spark.style.setProperty('--dx', Math.cos(angle) * distance + 'px');
+      spark.style.setProperty('--dy', Math.sin(angle) * distance + 'px');
+      document.body.appendChild(spark);
+      setTimeout(() => spark.remove(), 720);
+    }
+  }
+
+  document.addEventListener('pointerdown', (e) => {
+    burst(e.clientX, e.clientY);
+    pocket.ui.haptic('light').catch(() => {});
+  }, { passive: true });
+
+  document.getElementById('send').addEventListener('click', async () => {
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text) {
+      await pocket.ui.toast('先输入一点内容');
+      return;
+    }
+    input.value = '';
+    input.blur();
+    await pocket.ui.haptic('success');
+    await pocket.ui.toast('收到：' + text);
+  });
+
+  // 主题跟随系统
+  const darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  const pill = document.getElementById('themePill');
+  function syncTheme() {
+    pill.textContent = darkQuery.matches ? 'DARK' : 'LIGHT';
+  }
+  syncTheme();
+  darkQuery.addEventListener('change', syncTheme);
+
+  pocket.ready().then(() => {
+    pocket.ui.statusBar({ style: 'dark' }).catch(() => {});
+  });
+
+  // 触摸拖拽轻微倾斜，增加空间感
+  const core = document.querySelector('.core');
+  let dragging = false;
+  window.addEventListener('touchmove', (e) => {
+    if (!e.touches.length) return;
+    const t = e.touches[0];
+    const rx = (t.clientY / window.innerHeight - 0.5) * -16;
+    const ry = (t.clientX / window.innerWidth - 0.5) * 16;
+    core.style.transform = `perspective(600px) rotateX(${rx}deg) rotateY(${ry}deg)`;
+  }, { passive: true });
+
+  window.addEventListener('touchend', () => {
+    core.style.transform = '';
+  }, { passive: true });
+</script>
+</body>
+</html>

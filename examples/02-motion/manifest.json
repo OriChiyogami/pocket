@@ -1,0 +1,18 @@
+{
+  "schema": "pocket.app/1",
+  "id": "com.pocket.motion",
+  "name": "动效实验室",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "description": "复杂动效、安全区与键盘适配的验证场",
+  "accent": "#22B8CF",
+  "display": {
+    "orientation": "portrait",
+    "statusBar": "dark",
+    "fullscreen": false,
+    "edgeToEdge": true,
+    "background": "#FF05040A"
+  },
+  "permissions": ["haptic", "storage"],
+  "network": { "whitelist": [] }
+}

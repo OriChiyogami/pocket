@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>你好，口袋</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: #14121C;
+    background: #F7F6FA;
+    padding: calc(var(--pocket-safe-top, 0px) + 28px) 24px
+             calc(var(--pocket-safe-bottom, 0px) + 28px);
+    overflow-x: hidden;
+  }
+  body::before {
+    content: ""; position: fixed; inset: -20%;
+    background:
+      radial-gradient(45% 35% at 15% 5%, rgba(124,92,255,.22), transparent 70%),
+      radial-gradient(40% 30% at 95% 12%, rgba(255,107,157,.18), transparent 70%),
+      radial-gradient(50% 40% at 70% 95%, rgba(34,184,207,.14), transparent 70%);
+    pointer-events: none;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #F2F0F7; background: #0C0B10; }
+    body::before {
+      background:
+        radial-gradient(45% 35% at 15% 5%, rgba(124,92,255,.30), transparent 70%),
+        radial-gradient(40% 30% at 95% 12%, rgba(255,107,157,.22), transparent 70%),
+        radial-gradient(50% 40% at 70% 95%, rgba(34,184,207,.16), transparent 70%);
+    }
+  }
+  .wrap { position: relative; max-width: 560px; margin: 0 auto; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px; border-radius: 999px;
+    background: rgba(124,92,255,.12);
+    color: #7C5CFF; font-size: 12px; font-weight: 600;
+    letter-spacing: .4px;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #7C5CFF; }
+
+  h1 {
+    margin-top: 22px;
+    font-size: 40px; line-height: 1.18; letter-spacing: -1.4px; font-weight: 800;
+  }
+  h1 em {
+    font-style: normal;
+    background: linear-gradient(120deg, #7C5CFF 10%, #FF6B9D 90%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lead {
+    margin-top: 14px; font-size: 14.5px; line-height: 1.8; color: #6B6780; max-width: 30em;
+  }
+  @media (prefers-color-scheme: dark) { .lead { color: #9C97B0; } }
+
+  .card {
+    margin-top: 26px; padding: 20px;
+    border-radius: 26px;
+    background: rgba(255,255,255,.82);
+    border: 1px solid rgba(124,92,255,.14);
+    box-shadow: 0 18px 40px rgba(60,40,120,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    .card { background: rgba(255,255,255,.055); border-color: rgba(255,255,255,.09); box-shadow: none; }
+  }
+  .card h3 { font-size: 12px; letter-spacing: 1.4px; color: #8E89A3; font-weight: 600; text-transform: uppercase; }
+  .rows { margin-top: 12px; display: grid; gap: 10px; }
+  .row { display: flex; justify-content: space-between; font-size: 14px; }
+  .row span:first-child { color: #8E89A3; }
+  .row span:last-child { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .actions { margin-top: 22px; display: grid; gap: 12px; }
+  button {
+    width: 100%; border: none; padding: 16px; border-radius: 18px;
+    font-size: 15px; font-weight: 650; font-family: inherit;
+    transition: transform .16s ease, opacity .16s ease;
+  }
+  button:active { transform: scale(.975); opacity: .9; }
+  .primary { color: #fff; background: linear-gradient(135deg, #7C5CFF, #9A6BFF 55%, #FF6B9D); }
+  .ghost { color: #7C5CFF; background: rgba(124,92,255,.10); }
+  @media (prefers-color-scheme: dark) { .ghost { color: #B7A6FF; background: rgba(124,92,255,.16); } }
+
+  .foot { margin-top: 28px; text-align: center; font-size: 11px; color: #A8A3B8; letter-spacing: .3px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(var(--pocket-safe-bottom, 0px) + 28px);
+    transform: translate(-50%, 20px);
+    padding: 12px 20px; border-radius: 999px;
+    background: rgba(20,18,28,.92); color: #fff; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: all .28s cubic-bezier(.22,1,.36,1);
+    backdrop-filter: blur(10px);
+  }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="badge"><span class="dot"></span>Pocket 容器已连接</div>
+
+  <h1>你好，<br><em>口袋</em> 里的小玩意</h1>
+  <p class="lead">这段页面在真实 https 源下运行，拥有独立的存储空间，并且能调用原生能力。下面是它读到的设备信息。</p>
+
+  <div class="card">
+    <h3>设备信息</h3>
+    <div class="rows" id="rows">
+      <div class="row"><span>设备</span><span id="model">读取中…</span></div>
+      <div class="row"><span>系统</span><span id="os">—</span></div>
+      <div class="row"><span>视口</span><span id="screen">—</span></div>
+      <div class="row"><span>安全区</span><span id="safe">—</span></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="primary" id="btnToast">Toast + 触感反馈</button>
+    <button class="ghost" id="btnCopy">复制设备信息</button>
+  </div>
+
+  <p class="foot">v1.0.0 · 由口袋宿主自动注入 pocket-sdk</p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  let toastTimer = null;
+
+  function showToast(text) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.add('on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('on'), 1800);
+  }
+
+  function safeAreaText(area) {
+    return `${area.top} / ${area.right} / ${area.bottom} / ${area.left}`;
+  }
+
+  async function loadInfo() {
+    const info = await pocket.device.info();
+    $('model').textContent = `${info.brand} ${info.model}`;
+    $('os').textContent = info.os;
+    $('screen').textContent = `${info.dpWidth} × ${info.dpHeight} dp @${info.density.toFixed(2)}x`;
+    $('safe').textContent = safeAreaText(info.safeArea);
+    return info;
+  }
+
+  $('btnToast').addEventListener('click', async () => {
+    await pocket.ui.haptic('success');
+    await pocket.ui.toast('原生 Toast 已弹出');
+    showToast('这是页面内的自定义提示');
+  });
+
+  $('btnCopy').addEventListener('click', async () => {
+    const info = await pocket.device.info();
+    const text = `${info.brand} ${info.model} · ${info.os} · ${info.dpWidth}×${info.dpHeight}dp`;
+    await pocket.clipboard.write(text);
+    showToast('设备信息已复制到剪贴板');
+  });
+
+  pocket.ready().then(async () => {
+    await loadInfo();
+    showToast('页面已就绪，安全区变量已注入');
+  });
+
+  pocket.on('resume', () => showToast('应用回到前台'));
+</script>
+</body>
+</html>

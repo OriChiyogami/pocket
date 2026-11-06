@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>能力测试台</title>
+<style>
+  :root { color-scheme: light dark; --line: rgba(0,0,0,.08); }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", system-ui, sans-serif;
+    background: #FFFFFF; color: #14121C;
+    padding: calc(var(--pocket-safe-top, 0px) + 24px) 20px
+             calc(var(--pocket-safe-bottom, 0px) + 32px);
+    min-height: 100vh;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --line: rgba(255,255,255,.1); }
+    body { background: #0C0B10; color: #F2F0F7; }
+  }
+
+  .head { display: flex; align-items: flex-start; gap: 14px; }
+  .avatar {
+    width: 52px; height: 52px; border-radius: 18px; flex-shrink: 0;
+    background: linear-gradient(135deg, #FF9F43, #FF6B9D);
+    display: grid; place-items: center;
+    font-size: 22px; font-weight: 800; color: #fff;
+  }
+  .head h1 { font-size: 24px; font-weight: 800; letter-spacing: -.6px; }
+  .head p { margin-top: 5px; font-size: 12px; color: #8E89A3; line-height: 1.6; }
+
+  .group { margin-top: 26px; }
+  .group h2 {
+    font-size: 11px; letter-spacing: 1.6px; font-weight: 700;
+    color: #8E89A3; text-transform: uppercase; margin-bottom: 10px; padding-left: 4px;
+  }
+
+  .item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 15px 16px;
+    background: rgba(255,159,67,.06);
+    border: 1px solid var(--line);
+    border-radius: 18px; margin-bottom: 9px;
+    transition: transform .14s ease, background .14s ease;
+  }
+  .item:active { transform: scale(.985); background: rgba(255,159,67,.12); }
+  .item .name { flex: 1; font-size: 14.5px; font-weight: 600; }
+  .item .desc { display: block; font-size: 11px; color: #8E89A3; margin-top: 3px; font-weight: 400; }
+  .item .arrow { color: #FF9F43; font-size: 15px; font-weight: 700; }
+
+  .log {
+    margin-top: 22px; padding: 14px;
+    background: rgba(0,0,0,.04); border-radius: 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px; line-height: 1.75; color: #6B6780;
+    max-height: 240px; overflow-y: auto; white-space: pre-wrap;
+    word-break: break-word;
+  }
+  @media (prefers-color-scheme: dark) {
+    .log { background: rgba(255,255,255,.05); color: #9C97B0; }
+  }
+  .log b { color: #FF9F43; font-weight: 600; }
+
+  .reset {
+    margin-top: 16px; width: 100%; padding: 15px;
+    border-radius: 16px; border: 1px solid var(--line);
+    background: transparent; color: #E5484D; font-size: 13.5px; font-weight: 600;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+  <div class="head">
+    <div class="avatar">⚡</div>
+    <div>
+      <h1>能力测试台</h1>
+      <p>点每一条，看原生接口是否按 manifest 声明的权限正常工作。</p>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>界面</h2>
+    <div class="item" data-action="toast"><div class="name">Toast 提示<span class="desc">原生短提示</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="haptic"><div class="name">触感反馈<span class="desc">VibrationEffect</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="confirm"><div class="name">确认对话框<span class="desc">返回布尔值</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="prompt"><div class="name">输入对话框<span class="desc">返回字符串</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="sheet"><div class="name">底部动作单<span class="desc">返回索引</span></div><div class="arrow">→</div></div>
+  </div>
+
+  <div class="group">
+    <h2>数据</h2>
+    <div class="item" data-action="storage"><div class="name">存储读写<span class="desc">跨重启保留</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="keys"><div class="name">列出存储键<span class="desc">storage.keys</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="clipboard"><div class="name">剪贴板往返<span class="desc">写入后立即读回</span></div><div class="arrow">→</div></div>
+  </div>
+
+  <div class="group">
+    <h2>系统</h2>
+    <div class="item" data-action="network"><div class="name">网络状态<span class="desc">device.network</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="http"><div class="name">HTTP 请求<span class="desc">原生代理，绕过 CORS</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="share"><div class="name">分享文本<span class="desc">系统分享面板</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="notify"><div class="name">发送通知<span class="desc">需要通知权限</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="external"><div class="name">打开外部链接<span class="desc">交给系统浏览器</span></div><div class="arrow">→</div></div>
+    <div class="item" data-action="file"><div class="name">选择文件<span class="desc">返回 base64 Data URL</span></div><div class="arrow">→</div></div>
+  </div>
+
+  <div class="log" id="log">等待操作…</div>
+
+  <button class="reset" id="reset">清空所有数据</button>
+
+<script>
+  const logEl = document.getElementById('log');
+  let logLines = [];
+
+  function log(label, value) {
+    const text = typeof value === 'string' ? value : JSON.stringify(value, null, 0);
+    logLines.unshift(`<b>${label}</b> ${text}`);
+    logLines = logLines.slice(0, 40);
+    logEl.innerHTML = logLines.join('\n');
+  }
+
+  const actions = {
+    async toast() {
+      await pocket.ui.toast('这是原生 Toast');
+      log('ui.toast', '已弹出');
+    },
+    async haptic() {
+      await pocket.ui.haptic('heavy');
+      log('ui.haptic', 'heavy 已触发');
+    },
+    async confirm() {
+      const ok = await pocket.ui.confirm('确认要执行这个操作吗？', '确定', '算了');
+      log('ui.confirm', '返回 ' + ok);
+    },
+    async prompt() {
+      const value = await pocket.ui.prompt('你的名字', '请输入', '');
+      log('ui.prompt', value === null ? '已取消' : '返回 "' + value + '"');
+    },
+    async sheet() {
+      const index = await pocket.ui.actionSheet({ title: '选择一个操作', items: ['分享', '复制', '删除'] });
+      log('ui.actionSheet', index === null ? '已取消' : '选择了索引 ' + index);
+    },
+    async storage() {
+      const before = await pocket.storage.get('counter', 0);
+      const next = before + 1;
+      await pocket.storage.set('counter', next);
+      const after = await pocket.storage.get('counter');
+      const size = await pocket.storage.size();
+      log('storage', `写入前 ${before} → 写入后 ${after}，占用 ${size} 字节`);
+    },
+    async keys() {
+      const keys = await pocket.storage.keys();
+      log('storage.keys', keys);
+    },
+    async clipboard() {
+      const payload = '口袋测试 ' + new Date().toLocaleTimeString();
+      await pocket.clipboard.write(payload);
+      const readBack = await pocket.clipboard.read();
+      log('clipboard', `写入「${payload}」→ 读回「${readBack}」`);
+    },
+    async network() {
+      const info = await pocket.device.network();
+      log('device.network', info);
+    },
+    async http() {
+      log('http.request', '请求中…');
+      try {
+        const res = await pocket.http.request({
+          url: 'https://httpbin.org/get?from=pocket',
+          method: 'GET',
+          timeout: 15000
+        });
+        log('http.request', `status ${res.status} · ${String(res.body).slice(0, 120)}`);
+      } catch (error) {
+        log('http.request', '失败：' + error.code + ' ' + error.message);
+      }
+    },
+    async share() {
+      await pocket.share.text({ text: '来自口袋的小玩意', subject: '口袋' });
+      log('share.text', '已调起分享面板');
+    },
+    async notify() {
+      try {
+        await pocket.notify.show({ title: '口袋', body: '通知接口工作正常' });
+        log('notify.show', '已发送');
+      } catch (error) {
+        log('notify.show', '失败：' + error.message);
+      }
+    },
+    async external() {
+      await pocket.system.openExternal('https://example.com');
+      log('system.openExternal', '已交给系统浏览器');
+    },
+    async file() {
+      const files = await pocket.file.pick({ accept: 'image/*', multiple: false });
+      if (!files) {
+        log('file.pick', '已取消');
+        return;
+      }
+      log('file.pick', `${files[0].name} · ${files[0].mime} · ${files[0].size} 字节`);
+    }
+  };
+
+  document.querySelectorAll('.item').forEach((item) => {
+    item.addEventListener('click', async () => {
+      const name = item.dataset.action;
+      try {
+        await actions[name]();
+      } catch (error) {
+        log(name, '异常：' + (error.code || '') + ' ' + error.message);
+      }
+    });
+  });
+
+  document.getElementById('reset').addEventListener('click', async () => {
+    const ok = await pocket.ui.confirm('清空所有本地数据？', '清空', '取消');
+    if (!ok) return;
+    await pocket.storage.clear();
+    try { localStorage.clear(); } catch (e) {}
+    log('reset', '已清空');
+    await pocket.ui.toast('数据已清空');
+  });
+
+  pocket.ready().then(async () => {
+    const info = await pocket.app.info();
+    log('app.info', `${info.name} ${info.version} · ${info.origin}`);
+  });
+</script>
+</body>
+</html>

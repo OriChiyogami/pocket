@@ -1,0 +1,15 @@
+{
+  "name": "pocket-cli",
+  "version": "1.0.0",
+  "description": "口袋 Pocket 小应用打包工具（零依赖）",
+  "bin": {
+    "pocket": "bin/pocket.js"
+  },
+  "main": "lib/pack.js",
+  "engines": {
+    "node": ">=16"
+  },
+  "scripts": {
+    "build:examples": "node bin/pocket.js pack ../examples/01-hello -o ../dist/hello.pkt && node bin/pocket.js pack ../examples/02-motion -o ../dist/motion.pkt && node bin/pocket.js pack ../examples/03-tool -o ../dist/tool.pkt"
+  }
+}

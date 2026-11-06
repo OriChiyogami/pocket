@@ -1,0 +1,17 @@
+{
+  "schema": "pocket.app/1",
+  "id": "com.pocket.hello",
+  "name": "你好，口袋",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "description": "最小示例：安全区、原生能力与设备信息",
+  "accent": "#7C5CFF",
+  "display": {
+    "orientation": "portrait",
+    "statusBar": "light",
+    "fullscreen": false,
+    "background": "#FFF7F6FA"
+  },
+  "permissions": ["storage", "haptic", "clipboard", "share", "external"],
+  "network": { "whitelist": [] }
+}

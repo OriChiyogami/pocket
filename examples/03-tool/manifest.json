@@ -1,0 +1,17 @@
+{
+  "schema": "pocket.app/1",
+  "id": "com.pocket.tool",
+  "name": "能力测试台",
+  "version": "1.0.0",
+  "entry": "index.html",
+  "description": "逐项验证存储、网络、分享、文件等原生接口",
+  "accent": "#FF9F43",
+  "display": {
+    "orientation": "auto",
+    "statusBar": "light",
+    "fullscreen": false,
+    "background": "#FFFFFFFF"
+  },
+  "permissions": ["storage", "http", "clipboard", "share", "haptic", "file", "external", "notify"],
+  "network": { "whitelist": ["httpbin.org", "api.github.com"] }
+}
