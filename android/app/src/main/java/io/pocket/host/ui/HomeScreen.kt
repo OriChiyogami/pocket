@@ -62,6 +62,7 @@ fun HomeScreen(
     onOpenFolder: (String) -> Unit,
     onAdd: () -> Unit,
     onSettings: () -> Unit,
+    onAi: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val looseApps = apps.filter { it.folder.isNullOrEmpty() }
@@ -97,6 +98,22 @@ fun HomeScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 0.4.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(end = 10.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(PocketPurple.copy(alpha = 0.13f))
+                        .clickable(onClick = onAi),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "AI",
+                        color = PocketPurple,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
                 Box(

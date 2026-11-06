@@ -7,6 +7,9 @@ android/local.properties
 # 产物
 dist/*.apk
 dist/*.pkt
+dist/pocket-host.json
+dist/.pocket-server*.log
+library/
 
 # 个人内容（不公开，仅本地保留）
 examples/kaoyan-english/

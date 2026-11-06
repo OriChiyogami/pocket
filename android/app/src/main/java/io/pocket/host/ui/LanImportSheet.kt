@@ -33,6 +33,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -393,7 +394,8 @@ private fun AppListBlock(
     onInstall: (RemoteApp) -> Unit,
     onBack: () -> Unit
 ) {
-    val installed = PocketApp.of(LocalContext.current).repository.apps.value
+    val repoApps = PocketApp.of(LocalContext.current).repository
+    val installed by repoApps.apps.collectAsState()
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -421,15 +423,16 @@ private fun AppListBlock(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(apps, key = { it.id.ifEmpty { it.file } }) { app ->
+                val existingVersion = installed.firstOrNull {
+                    it.id == app.id ||
+                        it.name.replace(" ", "") == app.name.replace(" ", "")
+                }?.version
                 RemoteAppRow(
                     server = server,
                     app = app,
-                    existingVersion = installed.firstOrNull {
-                        it.id == app.id ||
-                            it.name.replace(" ", "") == app.name.replace(" ", "")
-                    }?.version,
+                    existingVersion = existingVersion,
                     installing = installingId == app.id,
-                    disabled = installingId != null,
+                    disabled = installingId != null || existingVersion == app.version,
                     onInstall = { onInstall(app) }
                 )
             }
@@ -466,10 +469,12 @@ private fun RemoteAppRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = if (existingVersion != null && existingVersion != app.version)
-                    "已装 v$existingVersion → 新 v${app.version} · ${formatBytes(app.size)}"
-                else
-                    "v${app.version} · ${formatBytes(app.size)}",
+                text = when {
+                    existingVersion == null -> "v${app.version} · ${formatBytes(app.size)}"
+                    existingVersion != app.version ->
+                        "已装 v$existingVersion → 新 v${app.version} · ${formatBytes(app.size)}"
+                    else -> "已装 v${app.version} · 已是最新"
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -500,7 +505,7 @@ private fun RemoteAppRow(
                 Text(
                     when {
                         existingVersion == null -> "安装"
-                        existingVersion == app.version -> "重装"
+                        existingVersion == app.version -> "已装"
                         else -> "更新"
                     }
                 )

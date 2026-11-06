@@ -34,6 +34,9 @@ import io.pocket.host.core.InstalledApp
 import io.pocket.host.core.PackageInstaller
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.runner.AppRunnerActivity
+import io.pocket.host.core.AiConfig
+import io.pocket.host.ui.AiChatScreen
+import io.pocket.host.ui.AiSettingsSheet
 import io.pocket.host.ui.AppDetailSheet
 import io.pocket.host.ui.FolderPickerDialog
 import io.pocket.host.ui.FolderScreen
@@ -66,6 +69,9 @@ class MainActivity : ComponentActivity() {
     private var pastePrefill by mutableStateOf("")
     private var busy by mutableStateOf(false)
     private var confirmState by mutableStateOf<ConfirmState?>(null)
+    private var aiSettingsOpen by mutableStateOf(false)
+    private var aiChatOpen by mutableStateOf(false)
+    private var aiSummary by mutableStateOf("")
 
     private val importPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { importUri(it) }
@@ -78,6 +84,7 @@ class MainActivity : ComponentActivity() {
         val app = PocketApp.of(this)
         repo = app.repository
         installer = app.installer
+        aiSummary = AiConfig.load(this).summary()
 
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
@@ -102,6 +109,8 @@ class MainActivity : ComponentActivity() {
                             onBack = { settingsOpen = false },
                             onRestoreExamples = { restoreExamples() },
                             onCheckUpdate = { updateSheetOpen = true },
+                            onOpenAi = { aiSettingsOpen = true },
+                            aiSummary = aiSummary,
                             modifier = Modifier.systemBarsPadding()
                         )
                     } else if (folderScreen != null) {
@@ -130,6 +139,7 @@ class MainActivity : ComponentActivity() {
                             onOpenFolder = { folderScreen = it },
                             onAdd = { importSheetOpen = true },
                             onSettings = { settingsOpen = true },
+                            onAi = { aiChatOpen = true },
                             modifier = Modifier.systemBarsPadding()
                         )
                     }
@@ -201,6 +211,21 @@ class MainActivity : ComponentActivity() {
                 if (lanSheetOpen) {
                     LanImportSheet(
                         onDismiss = { lanSheetOpen = false }
+                    )
+                }
+
+                if (aiChatOpen) {
+                    AiChatScreen(
+                        onBack = { aiChatOpen = false },
+                        onOpenSettings = { aiSettingsOpen = true },
+                        aiSummary = aiSummary
+                    )
+                }
+
+                if (aiSettingsOpen) {
+                    AiSettingsSheet(
+                        onDismiss = { aiSettingsOpen = false },
+                        onSaved = { aiSummary = AiConfig.load(this@MainActivity).summary() }
                     )
                 }
 
@@ -280,8 +305,14 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                BackHandler(enabled = settingsOpen || folderScreen != null) {
-                    if (folderScreen != null) folderScreen = null else settingsOpen = false
+                BackHandler(enabled = settingsOpen || folderScreen != null || aiChatOpen) {
+                    if (aiChatOpen) {
+                        aiChatOpen = false
+                    } else if (folderScreen != null) {
+                        folderScreen = null
+                    } else {
+                        settingsOpen = false
+                    }
                 }
             }
         }

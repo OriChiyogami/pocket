@@ -299,12 +299,60 @@ speechSynthesis.speak(u);
 - 单词 / 短语（≤3 个词、无标点）→ 走原生代理请求百度词典 `fanyi.baidu.com/sug`，返回释义
 - 整句 → MyMemory 机翻（`https://api.mymemory.translated.net/get`）
 
-涉及的域名要写进 `manifest.network.whitelist`，否则首次会弹「网络访问请求」；内置的英文学习类示例应用
-已经在 manifest 里写好了 `api.mymemory.translated.net`、`translate.googleapis.com`、`fanyi.baidu.com` 三个域名。
+涉及的域名要写进 `manifest.network.whitelist`，否则首次会弹「网络访问请求」；示例应用可以在 manifest 里
+写好自己的白名单，例如 `api.mymemory.translated.net`、`translate.googleapis.com`、`fanyi.baidu.com`。
 
 ---
 
-## 8. 事件
+## 8. AI 对话
+
+宿主里配置一次模型（设置 → AI 模型），所有应用通过 `pocket.ai` 统一调用，**不需要也不应该**各自保存 API Key。
+
+### `pocket.ai.chat(options | prompt): Promise<string>`
+
+```js
+// 最快：一句话
+const answer = await pocket.ai.chat('用一句话解释光合作用');
+
+// 带上下文（做「这题为什么选 C」这类追问）
+const reply = await pocket.ai.chat({
+  system: '你是答疑老师，用中文回答，解释要短。',
+  messages: [
+    { role: 'user', content: '题干：…… 选项：A…B…C…D…，正确答案是 C。为什么不选 B？' }
+  ],
+  temperature: 0.3,
+  maxTokens: 600
+});
+```
+
+- 返回：助手回复的**纯文本字符串**
+- 失败：Promise reject，`err.code = 'E_AI'`，`err.message` 里带接口状态码与返回片段
+- 可选参数：`system`、`temperature`（默认 0.7）、`maxTokens`（默认不限制）
+- 超时：连接 15 秒、读取 90 秒
+- 不需要在 `manifest.permissions` 里声明（属于宿主级能力，和 tts 一样）
+
+### `pocket.ai.ask(prompt, system?): Promise<string>`
+`chat` 的简写版。
+
+### `pocket.ai.status(): Promise<{ available, provider, model }>`
+
+```js
+const st = await pocket.ai.status();
+if (!st.available) { /* 引导用户去 设置 → AI 模型 */ }
+```
+
+### 两种模型配置
+
+| 类型 | 需要填 | 说明 |
+| --- | --- | --- |
+| DeepSeek | 只填 API Key | 地址固定 `https://api.deepseek.com`，模型默认 `deepseek-chat` |
+| 其他 / 中转站 | Base URL + Key + 模型名 | 标准 OpenAI 格式：`POST {BaseURL}/chat/completions`，`Authorization: Bearer <Key>` |
+
+Key 只存在手机本地（SharedPreferences），不会随应用包分发。
+
+---
+
+## 9. 事件
 
 ```js
 pocket.on('back', () => {

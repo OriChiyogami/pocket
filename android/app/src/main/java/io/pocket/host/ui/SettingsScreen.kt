@@ -38,6 +38,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onRestoreExamples: () -> Unit,
     onCheckUpdate: () -> Unit,
+    onOpenAi: () -> Unit,
+    aiSummary: String,
     modifier: Modifier = Modifier
 ) {
     val totalBytes = apps.sumOf { it.sizeBytes }
@@ -73,6 +75,34 @@ fun SettingsScreen(
         SectionTitle("存储")
         InfoRow("已安装应用", "${apps.size} 个")
         InfoRow("占用空间", formatBytes(totalBytes))
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        SectionTitle("AI")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                .clickable(onClick = onOpenAi)
+                .padding(16.dp)
+        ) {
+            Column {
+                Text(
+                    text = "AI 模型配置",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = if (aiSummary.isBlank() || aiSummary == "未配置")
+                        "DeepSeek 只需填 Key；也支持 OpenAI 兼容的中转站。应用可通过 pocket.ai.chat 统一调用"
+                    else "$aiSummary · 应用可通过 pocket.ai.chat 统一调用",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 

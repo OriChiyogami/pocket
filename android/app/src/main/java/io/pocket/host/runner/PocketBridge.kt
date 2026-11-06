@@ -20,6 +20,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.core.app.NotificationCompat
 import io.pocket.host.R
+import io.pocket.host.core.AiConfig
 import io.pocket.host.core.BridgeException
 import io.pocket.host.core.InstalledApp
 import io.pocket.host.core.PackageRepository
@@ -271,6 +272,52 @@ class PocketBridge(
                 "http.request" -> {
                     requirePermission("http")
                     handleHttp(id, params)
+                }
+
+                "ai.config" -> {
+                    val active = AiConfig.active(hostContext())
+                    resolve(
+                        id, true,
+                        JSONObject()
+                            .put("available", active != null)
+                            .put("provider", active?.provider ?: "")
+                            .put("model", active?.model ?: ""),
+                        null
+                    )
+                }
+
+                "ai.chat" -> {
+                    val system = params.optString("system", "")
+                    val messages = mutableListOf<Pair<String, String>>()
+                    params.optJSONArray("messages")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            val item = arr.optJSONObject(i) ?: continue
+                            val content = item.optString("content")
+                            if (content.isNotBlank()) {
+                                messages.add(item.optString("role", "user") to content)
+                            }
+                        }
+                    }
+                    val prompt = params.optString("prompt", "")
+                    if (messages.isEmpty() && prompt.isNotBlank()) messages.add("user" to prompt)
+                    if (messages.isEmpty()) {
+                        resolve(id, false, null, BridgeException("E_INVALID_ARG", "messages 不能为空"))
+                    } else {
+                        val temperature = params.optDouble("temperature", 0.7)
+                        val maxTokens = params.optInt("maxTokens", 0)
+                        io.execute {
+                            runCatching {
+                                AiConfig.chat(
+                                    hostContext(), messages,
+                                    system.ifBlank { null }, temperature, maxTokens
+                                )
+                            }.onSuccess { text ->
+                                resolve(id, true, JSONObject().put("text", text), null)
+                            }.onFailure { e ->
+                                resolve(id, false, null, BridgeException("E_AI", e.message ?: "AI 调用失败"))
+                            }
+                        }
+                    }
                 }
 
                 "tts.speak" -> {

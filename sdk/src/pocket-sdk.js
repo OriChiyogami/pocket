@@ -34,6 +34,7 @@
     'notify.show': 1,
     'system.openExternal': 1,
     'http.request': 1,
+    'ai.chat': 1,
     'tts.speak': 1,
     'tts.stop': 1,
     'tts.available': 1
@@ -340,6 +341,34 @@
       },
       stop: function () { return invoke('tts.stop'); },
       available: function () { return invoke('tts.available'); }
+    },
+
+    /* ---- AI（统一走宿主里配置的模型，应用不用自带 Key） ---- */
+    ai: {
+      /** 当前是否配置了模型：{ available, provider, model } */
+      status: function () { return invoke('ai.config'); },
+
+      /**
+       * 对话。返回助手回复的纯文本。
+       * chat('你好') / chat({ prompt: '...', system: '...' })
+       * chat({ messages: [{role:'user',content:'...'}, ...], system, temperature, maxTokens })
+       */
+      chat: function (a, b) {
+        var opts = typeof a === 'string' ? { prompt: a } : (a || {});
+        var messages = opts.messages;
+        if (!messages && opts.prompt) messages = [{ role: 'user', content: String(opts.prompt) }];
+        return invoke('ai.chat', {
+          messages: messages || [],
+          system: opts.system || '',
+          temperature: typeof opts.temperature === 'number' ? opts.temperature : 0.7,
+          maxTokens: typeof opts.maxTokens === 'number' ? opts.maxTokens : 0
+        }).then(function (r) { return (r && r.text !== undefined) ? r.text : r; });
+      },
+
+      /** 只要一句话问答的快捷方式 */
+      ask: function (prompt, system) {
+        return pocket.ai.chat({ prompt: String(prompt == null ? '' : prompt), system: system || '' });
+      }
     },
 
     /* ---- 剪贴板 ---- */

@@ -164,6 +164,32 @@ function packHtmlBuffer(dir, htmlBuffer, originalName) {
   return { file, manifest };
 }
 
+/** 本机 HTML 收藏：文件名清洗 + 扫描 */
+function sanitizeHtmlName(raw) {
+  const base = path.basename(String(raw || '')).replace(/\.html?$/i, '').trim() || 'html';
+  return base.replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 60) + '.html';
+}
+
+function scanHtmlLibrary(dir) {
+  try {
+    return fs.readdirSync(dir)
+      .filter((f) => /\.html?$/i.test(f))
+      .map((file) => {
+        const full = path.join(dir, file);
+        const st = fs.statSync(full);
+        return {
+          file,
+          name: file.replace(/\.html?$/i, ''),
+          size: st.size,
+          modifiedAt: st.mtimeMs
+        };
+      })
+      .sort((a, b) => b.modifiedAt - a.modifiedAt);
+  } catch (e) {
+    return [];
+  }
+}
+
 function readBody(req, limit = MAX_UPLOAD) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -193,6 +219,7 @@ function escapeHtml(text) {
 
 function renderPage(options) {
   const { name, port, addresses, apps, host } = options;
+  const library = options.library || [];
   const addrList = addresses.length
     ? addresses.map((a) => `<span class="chip">${a.address}:${port}</span>`).join('')
     : '<span class="chip muted">未检测到局域网地址</span>';
@@ -213,6 +240,23 @@ function renderPage(options) {
         </div>
       </div>`).join('')
     : `<div class="empty"><div class="emptyIcon">＋</div><h3>还没有插件包</h3><p>把 .pkt 或 .html 拖到上面的上传区，手机端即可立刻看到</p></div>`;
+
+  const libraryCards = library.length
+    ? library.map((item) => `
+      <div class="card libCard" data-lib="${escapeHtml(item.file)}">
+        <div class="icon lib" style="--accent:#22B8CF"><span>H</span></div>
+        <div class="meta">
+          <div class="row1"><h3>${escapeHtml(item.name)}</h3></div>
+          <div class="sub">${formatSize(item.size)} · ${escapeHtml(item.file)} · ${new Date(item.modifiedAt).toLocaleString('zh-CN')}</div>
+        </div>
+        <div class="ops">
+          <button class="mini text" data-lib-open title="在电脑上打开">打开</button>
+          <button class="mini text" data-lib-send title="打包并发到手机">发到手机</button>
+          <button class="mini text" data-lib-rename title="重命名">✎</button>
+          <button class="mini danger" data-lib-rm title="从收藏中删除">✕</button>
+        </div>
+      </div>`).join('')
+    : `<div class="empty"><div class="emptyIcon">H</div><h3>还没有本机 HTML</h3><p>把平时在电脑上用的 .html 拖到上面的上传区，就会收进这里；随时能打开或发到手机</p></div>`;
 
   const hostSection = host
     ? `<div class="panel">
@@ -318,6 +362,7 @@ function renderPage(options) {
   .mini:hover { background: rgba(124,92,255,.12); }
   .mini.danger { color: #E5484D; }
   .mini.danger:hover { background: rgba(229,72,77,.12); }
+  .mini.text { width: auto; padding: 0 11px; font-size: 12.5px; font-weight: 600; }
   @media (prefers-color-scheme: dark) { .mini { border-color: rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #B7A6FF; } }
 
   .empty { text-align: center; padding: 50px 20px; border-radius: 20px; border: 1px dashed rgba(124,92,255,.28); }
@@ -370,7 +415,7 @@ function renderPage(options) {
     <input type="file" id="fileInput" multiple accept=".pkt,.html,.htm">
     <div class="dropIcon">↑</div>
     <h3>把 .pkt 拖到这里，或点击选择</h3>
-    <p>直接拖 AI 生成的 .html 也可以，会自动打包成应用 · 单文件最大 64MB</p>
+    <p>.html 会同时收进「本机 HTML 收藏」并自动生成手机应用 · 单文件最大 64MB</p>
     <div class="uploadStatus" id="uploadStatus"></div>
   </label>
 
@@ -381,6 +426,14 @@ function renderPage(options) {
   </div>
 
   <div class="grid" id="grid">${cards}</div>
+
+  <div class="sectionTitle">
+    <h2>本机 HTML 收藏</h2>
+    <span class="count" id="libCount">${library.length}</span>
+    <span class="hint">平时在电脑上用的 .html 收在这里，随时打开或发到手机</span>
+  </div>
+
+  <div class="grid" id="libGrid">${libraryCards}</div>
 
   <footer>口袋 Pocket · 电脑端服务 · 端口 ${port} · 目录 ${escapeHtml(options.dir)}</footer>
 </div>
@@ -479,6 +532,65 @@ function renderPage(options) {
     });
   });
 
+  var libGrid = document.getElementById('libGrid');
+  if (libGrid) {
+    libGrid.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-lib-open],[data-lib-send],[data-lib-rename],[data-lib-rm]');
+      if (!btn) return;
+      var card = btn.closest('[data-lib]');
+      var file = card ? card.getAttribute('data-lib') : '';
+      if (!file) return;
+
+      if (btn.hasAttribute('data-lib-open')) {
+        window.open('/library/' + encodeURIComponent(file), '_blank');
+        return;
+      }
+
+      if (btn.hasAttribute('data-lib-send')) {
+        btn.disabled = true;
+        btn.textContent = '发送中…';
+        fetch('/api/library/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: file })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (!j.ok) throw new Error(j.error || '发送失败');
+          location.reload();
+        }).catch(function (err) {
+          btn.disabled = false;
+          btn.textContent = '发到手机';
+          alert(err.message);
+        });
+        return;
+      }
+
+      if (btn.hasAttribute('data-lib-rename')) {
+        var title = card.querySelector('h3').textContent;
+        var next = prompt('重命名收藏（不用写 .html）', title);
+        if (!next || next === title) return;
+        fetch('/api/library/rename', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: file, name: next })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.ok) location.reload(); else alert(j.error || '重命名失败');
+        });
+        return;
+      }
+
+      if (btn.hasAttribute('data-lib-rm')) {
+        if (!confirm('从本机收藏中删除「' + file + '」？\\n已发到手机的应用不受影响。')) return;
+        fetch('/api/library/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: file })
+        }).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.ok) location.reload(); else alert(j.error || '删除失败');
+        });
+      }
+    });
+  }
+
   var shutdown = document.getElementById('shutdown');
   shutdown.addEventListener('click', function () {
     if (!confirm('关闭电脑端服务？\\n关闭后手机暂时无法从这台电脑导入，重新双击桌面快捷方式即可再启动。')) return;
@@ -508,11 +620,22 @@ function startServer(options) {
   const name = options.name || os.hostname();
   const addresses = lanAddresses();
   const pidFile = path.join(dir, '.pocket-server.json');
+  // 本机 HTML 收藏目录：默认项目和 dist 同级
+  const libraryDir = path.resolve(options.library || path.join(dir, '..', 'library'));
 
   fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(libraryDir, { recursive: true });
 
   let stopping = false;
   let udp = null;
+
+  // 后台常驻：任何单次请求异常都不应该让整个服务退出
+  process.on('uncaughtException', (err) => {
+    console.error('[pocket] 未捕获异常（服务继续运行）:', (err && err.stack) || err);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[pocket] 未处理的 Promise 拒绝（服务继续运行）:', reason);
+  });
 
   function stopService() {
     if (stopping) return;
@@ -543,6 +666,7 @@ function startServer(options) {
           port,
           addresses,
           apps,
+          library: scanHtmlLibrary(libraryDir),
           host: readHostInfo(dir),
           dir: path.relative(process.cwd(), dir) || dir
         });
@@ -554,6 +678,84 @@ function startServer(options) {
       if (pathname === '/api/apps') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify({ name, port, apps: scanLibrary(dir) }));
+        return;
+      }
+
+      if (pathname === '/api/library') {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(JSON.stringify({ ok: true, library: scanHtmlLibrary(libraryDir) }));
+        return;
+      }
+
+      if (pathname === '/api/library/send' && req.method === 'POST') {
+        const payload = JSON.parse((await readBody(req, 1024 * 1024)).toString('utf8') || '{}');
+        const file = path.basename(payload.file || '');
+        const full = path.join(libraryDir, file);
+        if (!file || !fs.existsSync(full)) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: '收藏里没有这个文件' }));
+          return;
+        }
+        const html = fs.readFileSync(full, 'utf8');
+        const result = packHtmlBuffer(dir, Buffer.from(html, 'utf8'), file);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({
+          ok: true,
+          file: result.file,
+          id: result.manifest.id,
+          version: result.manifest.version,
+          name: result.manifest.name
+        }));
+        return;
+      }
+
+      if (pathname === '/api/library/delete' && req.method === 'POST') {
+        const payload = JSON.parse((await readBody(req, 1024 * 1024)).toString('utf8') || '{}');
+        const file = path.basename(payload.file || '');
+        const full = path.join(libraryDir, file);
+        if (!file || !fs.existsSync(full)) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: '收藏里没有这个文件' }));
+          return;
+        }
+        fs.unlinkSync(full);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true }));
+        return;
+      }
+
+      if (pathname === '/api/library/rename' && req.method === 'POST') {
+        const payload = JSON.parse((await readBody(req, 1024 * 1024)).toString('utf8') || '{}');
+        const file = path.basename(payload.file || '');
+        const full = path.join(libraryDir, file);
+        if (!file || !fs.existsSync(full)) {
+          res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: '收藏里没有这个文件' }));
+          return;
+        }
+        const next = sanitizeHtmlName(payload.name || '');
+        const target = path.join(libraryDir, next);
+        if (fs.existsSync(target) && target !== full) {
+          res.writeHead(409, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ error: '同名收藏已存在' }));
+          return;
+        }
+        fs.renameSync(full, target);
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true, file: next }));
+        return;
+      }
+
+      if (pathname.startsWith('/library/')) {
+        const file = path.basename(decodeURIComponent(pathname.slice('/library/'.length)));
+        const full = path.join(libraryDir, file);
+        if (!file || !fs.existsSync(full)) {
+          res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+          res.end('not found');
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        fs.createReadStream(full).pipe(res);
         return;
       }
 
@@ -614,6 +816,10 @@ function startServer(options) {
         let result;
         if (isHtml) {
           result = packHtmlBuffer(dir, body, filename);
+          // 同时收进本机 HTML 收藏，以后在电脑上也能翻到
+          try {
+            fs.writeFileSync(path.join(libraryDir, sanitizeHtmlName(filename)), body);
+          } catch (e) {}
         } else {
           const safe = uniqueFile(dir, slugify(filename.replace(/\.pkt$/i, '')), '.pkt');
           const target = path.join(dir, safe);

@@ -1,32 +1,40 @@
-﻿$root = Split-Path -Parent $PSScriptRoot
-Set-Location $root
-$Host.UI.RawUI.WindowTitle = '口袋电脑端'
+﻿param([switch]$NoBrowser)
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Host '未找到 Node.js，请先安装 Node 并确保 node 在 PATH 中。'
-    Read-Host '按回车关闭'
+$root = Split-Path -Parent $PSScriptRoot
+Set-Location $root
+
+$node = (Get-Command node -ErrorAction SilentlyContinue).Source
+if (-not $node) {
+    Add-Type -AssemblyName PresentationFramework
+    [System.Windows.MessageBox]::Show('未找到 Node.js，请先安装 Node 并确保 node 在 PATH 中。', '口袋电脑端') | Out-Null
     exit 1
 }
 
+# 先收掉已经在跑的实例，避免端口冲突
 & (Join-Path $PSScriptRoot 'stop-pocket.ps1') -Quiet
 
-# 服务就绪后自动打开电脑端管理页（独立隐藏进程，不影响服务生命周期）
-Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
-    '-NoProfile',
-    '-Command',
-    'Start-Sleep -Seconds 2; Start-Process "http://127.0.0.1:8570/"'
-) | Out-Null
+$dist = Join-Path $root 'dist'
+$outLog = Join-Path $dist '.pocket-server.out.log'
+$errLog = Join-Path $dist '.pocket-server.err.log'
+$serve = Join-Path $root 'cli\bin\pocket.js'
 
-Write-Host ''
-Write-Host '  口袋 · 电脑端服务启动中…'
-Write-Host '  手机：口袋 → + → 从电脑导入'
-Write-Host '  关闭：直接关闭本窗口，或点管理页右上角「关闭服务」'
-Write-Host ''
+if (-not (Test-Path $dist)) { New-Item -ItemType Directory -Path $dist | Out-Null }
 
-try {
-    node (Join-Path $root 'cli\bin\pocket.js') serve --dir (Join-Path $root 'dist') --port 8570 --name $env:COMPUTERNAME
-} finally {
-    Write-Host ''
-    Write-Host '口袋电脑端已停止，可以关闭窗口。'
-    Read-Host
+# 隐藏窗口 + 独立进程启动：关掉任何窗口、注销当前会话以外的情况都不会带走服务
+# 注意：路径含中文和空格，参数必须显式加引号，否则会被拆成多段
+$argLine = '"{0}" serve --dir "{1}" --port 8570 --name "{2}"' -f $serve, $dist, $env:COMPUTERNAME
+Start-Process -FilePath $node `
+    -ArgumentList $argLine `
+    -WorkingDirectory $root -WindowStyle Hidden `
+    -RedirectStandardOutput $outLog -RedirectStandardError $errLog | Out-Null
+
+if (-not $NoBrowser) {
+    for ($i = 0; $i -lt 25; $i++) {
+        try {
+            $r = Invoke-WebRequest -Uri 'http://127.0.0.1:8570/api/health' -UseBasicParsing -TimeoutSec 1
+            if ($r.StatusCode -eq 200) { break }
+        } catch {}
+        Start-Sleep -Milliseconds 300
+    }
+    Start-Process 'http://127.0.0.1:8570/'
 }
