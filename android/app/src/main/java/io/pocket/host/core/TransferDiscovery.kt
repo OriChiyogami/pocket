@@ -1,10 +1,12 @@
 package io.pocket.host.core
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.os.Build
 import org.json.JSONObject
 import java.net.DatagramPacket
 import java.net.DatagramSocket
+import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
@@ -33,10 +35,13 @@ data class Peer(
 }
 
 /**
- * UDP 8571 设备发现：
- *  - 收到 POCKET_DISCOVER/1 立即回自己的信息
- *  - 每 5 秒广播一次自己的信息（电脑端据此列出手机）
- *  - 收到其它设备的 JSON 就记入设备表，20 秒过期
+ * UDP 8571 设备发现。
+ *
+ * 广播在部分环境（Windows 移动热点、开启 AP 隔离的路由器）不互通，所以这里同时做：
+ *  - 回应对端的 POCKET_DISCOVER/1 探测
+ *  - 每 5 秒向 255.255.255.255、本网段广播地址、默认网关、记住过的设备 **单播** 自己的信息和探测包
+ *
+ * 手机连电脑热点时，默认网关就是电脑，单播能通，于是双方都能互相发现。
  */
 object TransferDiscovery {
 
@@ -44,11 +49,16 @@ object TransferDiscovery {
     private const val PROBE = "POCKET_DISCOVER/1"
     private const val PREFS = "pocket"
     private const val K_ID = "transfer_device_id"
+    private const val K_PEERS = "transfer_known_hosts"
+    private const val MAX_KNOWN = 24
     private const val EXPIRE_MS = 25_000L
 
     @Volatile private var socket: DatagramSocket? = null
     @Volatile private var loop: Thread? = null
     @Volatile private var running = false
+    @Volatile private var appContext: Context? = null
+    @Volatile private var gateway: String? = null
+    @Volatile private var subnetBroadcast: String? = null
 
     @Volatile var transferPort: Int = 0
         private set
@@ -58,6 +68,7 @@ object TransferDiscovery {
         private set
 
     private val peers = ConcurrentHashMap<String, Peer>()
+    private val known = java.util.Collections.synchronizedMap(LinkedHashMap<String, Long>())
 
     fun start(context: Context, port: Int) {
         if (running) {
@@ -65,8 +76,11 @@ object TransferDiscovery {
             return
         }
         transferPort = port
+        appContext = context.applicationContext
         deviceId = ensureId(context)
         deviceName = Build.MODEL?.trim().takeUnless { it.isNullOrBlank() } ?: "Android"
+        loadKnown(context)
+        refreshHints(context)
         running = true
         loop = thread(start = true, isDaemon = true, name = "pocket-discovery") {
             runLoop()
@@ -87,6 +101,7 @@ object TransferDiscovery {
     }
 
     fun infoJson(): JSONObject = JSONObject()
+        .put("service", "pocket")
         .put("id", deviceId)
         .put("name", deviceName)
         .put("platform", "android")
@@ -101,7 +116,7 @@ object TransferDiscovery {
                 .filter { it.isUp && !it.isLoopback }
                 .flatMap { nif -> Collections.list(nif.inetAddresses).map { nif.name to it } }
             val usable = addresses.filter { (_, addr) ->
-                addr is java.net.Inet4Address && !addr.isLoopbackAddress && addr.isSiteLocalAddress
+                addr is Inet4Address && !addr.isLoopbackAddress && addr.isSiteLocalAddress
             }
             val wifi = usable.firstOrNull { (name, _) -> name.startsWith("wlan") }
             (wifi ?: usable.firstOrNull())?.second?.hostAddress
@@ -122,7 +137,8 @@ object TransferDiscovery {
             try {
                 val now = System.currentTimeMillis()
                 if (now - lastAnnounce > 5000) {
-                    broadcast(s)
+                    refreshHints(appContext)
+                    announceAndProbe(s)
                     lastAnnounce = now
                 }
                 val packet = DatagramPacket(buffer, buffer.size)
@@ -166,10 +182,29 @@ object TransferDiscovery {
         return json.toString().toByteArray(Charsets.UTF_8)
     }
 
-    private fun broadcast(s: DatagramSocket) {
+    /**
+     * 每 5 秒一次：向所有能想到的目标同时发「自我介绍」和「探测包」。
+     * 自我介绍让电脑端登记手机；探测包让电脑端回一份自己的信息。
+     */
+    private fun announceAndProbe(s: DatagramSocket) {
+        val data = payload()
+        val probe = PROBE.toByteArray(Charsets.UTF_8)
+        val targets = linkedSetOf<String>()
+        targets.add("255.255.255.255")
+        subnetBroadcast?.let { targets.add(it) }
+        gateway?.let { targets.add(it) }
+        known.keys.forEach { targets.add(it) }
+
+        targets.forEach { host ->
+            if (host.isBlank()) return@forEach
+            sendTo(s, data, host)
+            sendTo(s, probe, host)
+        }
+    }
+
+    private fun sendTo(s: DatagramSocket, data: ByteArray, host: String) {
         runCatching {
-            val data = payload()
-            s.send(DatagramPacket(data, data.size, InetAddress.getByName("255.255.255.255"), DISCOVER_PORT))
+            s.send(DatagramPacket(data, data.size, InetAddress.getByName(host), DISCOVER_PORT))
         }
     }
 
@@ -187,14 +222,72 @@ object TransferDiscovery {
         if (id.isBlank() || id == deviceId) return
         val port = json.optInt("transferPort", json.optInt("port", 0))
         if (port <= 0) return
+        val host = json.optString("host").ifBlank { fromHost }
         peers[id] = Peer(
             id = id,
             name = json.optString("name", "未命名设备"),
             platform = json.optString("platform", "unknown"),
-            host = json.optString("host").ifBlank { fromHost },
+            host = host,
             port = port,
             lastSeen = System.currentTimeMillis()
         )
+        rememberHost(host)
+    }
+
+    // ---------------------------------------------------------------- 网络提示
+
+    /** 默认网关与所在网段的广播地址：热点场景下网关就是电脑。 */
+    private fun refreshHints(context: Context?) {
+        val ctx = context ?: return
+        runCatching {
+            val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val props = cm.getLinkProperties(cm.activeNetwork) ?: return
+            gateway = props.routes?.firstOrNull { it.isDefaultRoute }?.gateway?.hostAddress
+
+            val link = props.linkAddresses?.firstOrNull { it.address is Inet4Address }
+            val raw = (link?.address as? Inet4Address)?.address
+            if (raw != null && raw.size == 4) {
+                val ip = ((raw[0].toLong() and 0xFF) shl 24) or
+                    ((raw[1].toLong() and 0xFF) shl 16) or
+                    ((raw[2].toLong() and 0xFF) shl 8) or
+                    (raw[3].toLong() and 0xFF)
+                val prefix = (link?.prefixLength ?: 24).coerceIn(0, 32)
+                val mask = if (prefix == 0) 0L else (0xFFFFFFFFL shl (32 - prefix)) and 0xFFFFFFFFL
+                val broadcast = (ip or (mask.inv() and 0xFFFFFFFFL)) and 0xFFFFFFFFL
+                subnetBroadcast = "${(broadcast ushr 24) and 0xFF}." +
+                    "${(broadcast ushr 16) and 0xFF}." +
+                    "${(broadcast ushr 8) and 0xFF}." +
+                    "${broadcast and 0xFF}"
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------- 记住设备
+
+    private fun rememberHost(host: String) {
+        if (host.isBlank()) return
+        val isNew = !known.containsKey(host)
+        known[host] = System.currentTimeMillis()
+        if (known.size > MAX_KNOWN) {
+            known.keys.firstOrNull()?.let { known.remove(it) }
+        }
+        if (isNew) persistKnown()
+    }
+
+    private fun loadKnown(context: Context) {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(K_PEERS, "").orEmpty()
+        raw.split('\n').map { it.trim() }.filter { it.isNotBlank() }.forEach {
+            known[it] = 0L
+        }
+    }
+
+    private fun persistKnown() {
+        val ctx = appContext ?: return
+        val value = known.keys.joinToString("\n")
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(K_PEERS, value)
+            .apply()
     }
 
     private fun ensureId(context: Context): String {

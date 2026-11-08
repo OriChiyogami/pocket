@@ -32,6 +32,25 @@ function bestAddressFor(peerIp) {
   return match || addrs[0];
 }
 
+/** 各网卡的定向广播地址（例如 192.168.137.255），热点/路由器下比 255.255.255.255 更可靠。 */
+function broadcastAddresses() {
+  const out = new Set();
+  for (const list of Object.values(os.networkInterfaces() || {})) {
+    for (const item of list || []) {
+      if (item.family !== 'IPv4' && item.family !== 4) continue;
+      if (item.internal) continue;
+      const ip = String(item.address || '').split('.').map(Number);
+      const mask = String(item.netmask || '').split('.').map(Number);
+      if (ip.length !== 4 || mask.length !== 4) continue;
+      if (ip.some((n) => Number.isNaN(n)) || mask.some((n) => Number.isNaN(n))) continue;
+      if (ip[0] === 169) continue;
+      const broadcast = ip.map((part, i) => (part | (~mask[i] & 255)) & 255);
+      out.add(broadcast.join('.'));
+    }
+  }
+  return Array.from(out);
+}
+
 function formatSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -930,6 +949,40 @@ function startServer(options) {
   const transferPending = new Map();
   let announceTimer = null;
   const discoverPort = port + DISCOVER_PORT_OFFSET;
+  const broadcastTargets = broadcastAddresses();
+  let udpPackets = 0;
+  let lastUdp = null;
+
+  // 记住发现过的设备：热点/AP 隔离导致广播不通时，靠单播探测把它们找回来
+  const knownFile = path.join(libraryDir, '.pocket-devices.json');
+  const knownDevices = new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(knownFile, 'utf8'));
+    (Array.isArray(raw) ? raw : []).forEach((item) => {
+      if (item && item.host && Number(item.port)) {
+        knownDevices.set(item.host + ':' + Number(item.port), item);
+      }
+    });
+  } catch (e) {}
+  let knownSavedAt = 0;
+
+  function rememberDevice(device) {
+    const key = device.host + ':' + device.port;
+    const old = knownDevices.get(key);
+    knownDevices.set(key, {
+      id: device.id || key,
+      name: device.name || '设备',
+      host: device.host,
+      port: device.port
+    });
+    const now = Date.now();
+    if (!old || old.name !== device.name || now - knownSavedAt > 5000) {
+      knownSavedAt = now;
+      try {
+        fs.writeFileSync(knownFile, JSON.stringify(Array.from(knownDevices.values()).slice(-32), null, 2));
+      } catch (e) {}
+    }
+  }
 
   function sendJson(res, code, obj) {
     res.writeHead(code, {
@@ -1028,6 +1081,17 @@ function startServer(options) {
           port,
           transferPort: port,
           version: 1
+        });
+        return;
+      }
+
+      if (pathname === '/api/transfer/debug' && req.method === 'GET') {
+        sendJson(res, 200, {
+          addresses: lanAddresses().map((a) => a.address),
+          broadcasts: broadcastTargets,
+          known: Array.from(knownDevices.values()),
+          udpPackets,
+          lastUdp
         });
         return;
       }
@@ -1431,6 +1495,8 @@ function startServer(options) {
   udp = dgram.createSocket('udp4');
   udp.on('message', (msg, rinfo) => {
     const text = msg.toString('utf8').trim();
+    udpPackets += 1;
+    lastUdp = { from: rinfo.address, port: rinfo.port, at: Date.now(), sample: text.slice(0, 120) };
     if (text.startsWith('POCKET_DISCOVER')) {
       const payload = Buffer.from(JSON.stringify({
         service: 'pocket',
@@ -1453,14 +1519,16 @@ function startServer(options) {
       const transferPort = Number(json.transferPort || json.port || 0);
       if (!transferPort) return;
       const key = json.id || (rinfo.address + ':' + transferPort);
-      devices.set(key, {
+      const device = {
         id: key,
         name: json.name || '未命名设备',
         platform: json.platform || 'unknown',
         host: rinfo.address,
         port: transferPort,
         lastSeen: Date.now()
-      });
+      };
+      devices.set(key, device);
+      rememberDevice(device);
     } catch (e) {}
   });
 
@@ -1492,9 +1560,21 @@ function startServer(options) {
             transferPort: port,
             version: 1
           }), 'utf8');
-          try {
-            udp.send(payload, discoverPort, '255.255.255.255');
-          } catch (e) {}
+          const targets = new Set(['255.255.255.255', ...broadcastTargets]);
+          for (const host of targets) {
+            try {
+              udp.send(payload, discoverPort, host);
+            } catch (e) {}
+          }
+          // 广播不通的环境（Windows 移动热点 / AP 隔离）：单播探测记住过的设备
+          const probe = Buffer.from('POCKET_DISCOVER/1', 'utf8');
+          for (const device of knownDevices.values()) {
+            if (!device || !device.host) continue;
+            if (device.port === port && lanAddresses().some((a) => a.address === device.host)) continue;
+            try {
+              udp.send(probe, discoverPort, device.host);
+            } catch (e) {}
+          }
         };
         announceTimer = setInterval(announce, 5000);
         setTimeout(announce, 300);
