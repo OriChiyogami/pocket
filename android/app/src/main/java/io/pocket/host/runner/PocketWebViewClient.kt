@@ -62,7 +62,13 @@ class PocketWebViewClient(
                 "Accept-Ranges" to "bytes"
             )
             val range = request.requestHeaders["Range"] ?: request.requestHeaders["range"]
-            val mime = entry.mime.ifBlank { mimeOf(entry.name) }
+            // 互传时对端可能只给 application/octet-stream，按扩展名纠正，否则图片/视频无法预览
+            val stored = entry.mime.trim().lowercase()
+            val mime = if (stored.isBlank() || stored == "application/octet-stream") {
+                mimeOf(entry.name)
+            } else {
+                entry.mime
+            }
             return respondFile(file, mime, headers, range)
         }
 

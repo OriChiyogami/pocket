@@ -184,6 +184,12 @@ class PackageInstaller(
         if (repo.get(id) == null) installBuiltin(assetName)
     }
 
+    /** 内置应用随宿主升级：版本不一致就重装（只换 www，数据保留）。 */
+    fun ensureBuiltinVersion(assetName: String, id: String, version: String) {
+        val current = repo.get(id)
+        if (current == null || current.version != version) installBuiltin(assetName)
+    }
+
     private fun findPackageRoot(unpackDir: File): File? {
         if (File(unpackDir, "manifest.json").isFile) return unpackDir
         val children = unpackDir.listFiles()?.filter { it.isDirectory } ?: return null

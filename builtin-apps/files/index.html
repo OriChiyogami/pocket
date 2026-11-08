@@ -190,36 +190,49 @@
     document.getElementById('sheet').classList.add('show');
   }
 
+  var currentFile = null;
+
   function closeSheet() {
     document.getElementById('sheet').classList.remove('show');
     document.getElementById('previewBody').innerHTML = '';
+    currentFile = null;
   }
 
+  window.__previewFail = function () {
+    var f = currentFile;
+    if (!f) return;
+    document.getElementById('previewBody').innerHTML =
+      '<div class="noPreview">这个文件没法直接预览<br>' +
+      '<button id="saveFallback">保存到系统下载</button></div>';
+    var btn = document.getElementById('saveFallback');
+    if (btn) btn.onclick = function () { save(f); closeSheet(); };
+  };
+
   function preview(f) {
+    currentFile = f;
     var url = pocket.files.url(f.id);
     if (isImage(f)) {
-      openSheet(f.name, '<img src="' + url + '" alt="">');
+      openSheet(f.name, '<img src="' + url + '" alt="" onerror="__previewFail()">');
     } else if (isVideo(f)) {
-      openSheet(f.name, '<video src="' + url + '" controls autoplay playsinline></video>');
+      openSheet(f.name, '<video src="' + url + '" controls autoplay playsinline preload="metadata" ' +
+        'onerror="__previewFail()"></video>');
     } else if (isAudio(f)) {
       openSheet(f.name, '<div class="hint" style="margin-bottom:8px">' + esc(f.name) + '</div>' +
-        '<audio src="' + url + '" controls autoplay></audio>');
+        '<audio src="' + url + '" controls autoplay onerror="__previewFail()"></audio>');
     } else if (isText(f)) {
       openSheet(f.name, '<pre id="previewText">加载中…</pre>');
+      setTimeout(function () {
+        var node = document.getElementById('previewText');
+        if (node && node.textContent === '加载中…') window.__previewFail();
+      }, 8000);
       fetch(url).then(function (r) { return r.text(); }).then(function (text) {
         var node = document.getElementById('previewText');
         if (node) node.textContent = text.slice(0, 300000);
       }).catch(function () {
-        var node = document.getElementById('previewText');
-        if (node) node.textContent = '读取失败';
+        window.__previewFail();
       });
     } else {
-      openSheet(f.name, '<div class="noPreview">这个格式没法直接预览' +
-        '<br><button id="saveFromPreview">保存到系统下载</button></div>');
-      document.getElementById('saveFromPreview').addEventListener('click', function () {
-        save(f);
-        closeSheet();
-      });
+      window.__previewFail();
     }
   }
 
