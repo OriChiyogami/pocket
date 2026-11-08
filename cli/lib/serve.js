@@ -429,6 +429,8 @@ function renderPage(options) {
   .deviceCard.hover { border-color: #7C5CFF; background: rgba(124,92,255,.1); }
   .xfStatus { margin-top: 12px; font-size: 12.5px; color: #5B43C9; min-height: 18px; }
   @media (prefers-color-scheme: dark) { .xfStatus { color: #B7A6FF; } }
+  .xfBar { height: 6px; border-radius: 999px; background: rgba(124,92,255,.14); overflow: hidden; }
+  .xfBar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg,#7C5CFF,#FF6B9D); transition: width .15s ease; }
 
   .sectionTitle { margin: 32px 0 14px; display: flex; align-items: center; gap: 10px; }
   .sectionTitle h2 { font-size: 20px; font-weight: 700; }
@@ -550,6 +552,11 @@ function renderPage(options) {
 
   <div class="grid" id="devGrid"></div>
   <div class="xfStatus" id="xfStatus"></div>
+
+  <div id="recvWrap" style="display:none;margin-top:12px">
+    <div class="xfStatus" id="recvStatus" style="margin:0 0 8px"></div>
+    <div class="xfBar"><i id="recvBar"></i></div>
+  </div>
 
   <div class="sectionTitle">
     <h2>互传收到的文件</h2>
@@ -751,6 +758,13 @@ function renderPage(options) {
     return (bytes / 1048576).toFixed(1) + ' MB';
   }
 
+  function fmtSpeed(v) {
+    if (!v || v <= 0) return '';
+    if (v < 1024) return v + ' B/s';
+    if (v < 1048576) return (v / 1024).toFixed(1) + ' KB/s';
+    return (v / 1048576).toFixed(1) + ' MB/s';
+  }
+
   function renderDevices() {
     devCount.textContent = devices.length;
     if (!devices.length) {
@@ -799,10 +813,19 @@ function renderPage(options) {
   function putFile(url, file, onProgress) {
     return new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest();
+      var lastTime = Date.now();
+      var lastLoaded = 0;
       xhr.open('PUT', url);
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       xhr.upload.onprogress = function (e) {
-        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+        if (!e.lengthComputable || !onProgress) return;
+        var now = Date.now();
+        var speed = now > lastTime ? Math.round(((e.loaded - lastLoaded) * 1000) / (now - lastTime)) : 0;
+        if (now - lastTime >= 300 || e.loaded === e.total) {
+          onProgress(e.loaded / e.total, speed);
+          lastTime = now;
+          lastLoaded = e.loaded;
+        }
       };
       xhr.onload = function () {
         if (xhr.status >= 200 && xhr.status < 300) resolve();
@@ -836,8 +859,9 @@ function renderPage(options) {
       Array.prototype.forEach.call(files, function (file, i) {
         chain = chain.then(function () {
           setXf('正在发送 ' + (i + 1) + '/' + files.length + '：' + file.name);
-          return putFile(base + '/api/transfer/upload/' + offer.token + '/' + i, file, function (p) {
-            setXf('正在发送 ' + (i + 1) + '/' + files.length + '：' + file.name + ' ' + Math.round(p * 100) + '%');
+          return putFile(base + '/api/transfer/upload/' + offer.token + '/' + i, file, function (p, speed) {
+            setXf('正在发送 ' + (i + 1) + '/' + files.length + '：' + file.name + ' ' +
+              Math.round(p * 100) + '%' + (speed ? ' · ' + fmtSpeed(speed) : ''));
           });
         });
       });
@@ -909,6 +933,32 @@ function renderPage(options) {
 
   refreshDevices();
   refreshFiles();
+
+  var recvWrap = document.getElementById('recvWrap');
+
+  function refreshActive() {
+    fetch('/api/transfer/active').then(function (r) { return r.json(); }).then(function (j) {
+      var list = (j && j.transfers) || [];
+      if (!list.length) {
+        if (recvWrap) recvWrap.style.display = 'none';
+        return;
+      }
+      var t = list[0];
+      if (recvWrap) recvWrap.style.display = 'block';
+      var speed = fmtSpeed(t.speed);
+      var status = document.getElementById('recvStatus');
+      if (status) {
+        status.textContent = '正在接收 ' + t.name + ' · ' + t.percent + '%' +
+          (speed ? ' · ' + speed : '') +
+          ' · ' + sizeText(t.received) + (t.total > 0 ? ' / ' + sizeText(t.total) : '');
+      }
+      var bar = document.getElementById('recvBar');
+      if (bar) bar.style.width = (t.percent || 0) + '%';
+    }).catch(function () {});
+  }
+
+  refreshActive();
+  setInterval(refreshActive, 800);
   setInterval(refreshDevices, 2500);
   setInterval(refreshFiles, 8000);
 
@@ -953,6 +1003,7 @@ function startServer(options) {
   const deviceId = readDeviceId(libraryDir);
   const devices = new Map();
   const transferPending = new Map();
+  const activeTransfers = new Map();
   let announceTimer = null;
   const discoverPort = port + DISCOVER_PORT_OFFSET;
   const broadcastTargets = broadcastAddresses();
@@ -1183,13 +1234,35 @@ function startServer(options) {
         const out = fs.createWriteStream(target);
         let bytes = 0;
         let replied = false;
+        const activeKey = token + '/' + index;
+        const record = {
+          name: info.name,
+          total: Number(info.size) || 0,
+          received: 0,
+          speed: 0,
+          startedAt: Date.now(),
+          lastAt: Date.now(),
+          lastBytes: 0
+        };
+        activeTransfers.set(activeKey, record);
         const fail = (code, message) => {
           if (replied) return;
           replied = true;
+          activeTransfers.delete(activeKey);
           sendJson(res, code, { error: message });
         };
-        req.on('data', (chunk) => { bytes += chunk.length; });
+        req.on('data', (chunk) => {
+          bytes += chunk.length;
+          record.received = bytes;
+          const now = Date.now();
+          if (now - record.lastAt >= 250) {
+            record.speed = Math.round(((bytes - record.lastBytes) * 1000) / Math.max(1, now - record.lastAt));
+            record.lastAt = now;
+            record.lastBytes = bytes;
+          }
+        });
         req.on('aborted', () => {
+          activeTransfers.delete(activeKey);
           try { out.destroy(); } catch (e) {}
           try { fs.unlinkSync(target); } catch (e) {}
         });
@@ -1205,11 +1278,34 @@ function startServer(options) {
           replied = true;
           offer.done.add(index);
           if (offer.done.size >= offer.files.length) transferPending.delete(token);
+          record.received = bytes;
+          record.speed = 0;
+          setTimeout(() => activeTransfers.delete(activeKey), 1200);
           sendJson(res, 200, {
             ok: true,
             file: { id: name, name, size: bytes, mime: info.mime, time: Date.now() }
           });
         });
+        return;
+      }
+
+      if (pathname === '/api/transfer/active' && req.method === 'GET') {
+        const now = Date.now();
+        const list = [];
+        for (const [key, t] of activeTransfers) {
+          if (now - t.startedAt > 30 * 60 * 1000) {
+            activeTransfers.delete(key);
+            continue;
+          }
+          list.push({
+            name: t.name,
+            received: t.received,
+            total: t.total,
+            percent: t.total > 0 ? Math.min(100, Math.round((t.received * 100) / t.total)) : 0,
+            speed: t.speed
+          });
+        }
+        sendJson(res, 200, { ok: true, transfers: list });
         return;
       }
 

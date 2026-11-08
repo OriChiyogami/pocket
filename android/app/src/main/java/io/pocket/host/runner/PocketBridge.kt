@@ -469,8 +469,10 @@ class PocketBridge(
                                             }
                                         }
                                         TransferClient.send(
-                                            hostContext(), peer, sources, ::emitTransferProgress
-                                        )
+                                            hostContext(), peer, sources
+                                        ) { n, sent, total, speed ->
+                                            emitTransferProgress(n, sent, total, speed, "out")
+                                        }
                                     }.onSuccess { names ->
                                         resolve(
                                             id, true,
@@ -506,8 +508,10 @@ class PocketBridge(
                                     TransferClient.sourceOf(hostContext(), it)
                                 }
                                 TransferClient.send(
-                                    hostContext(), peer, sources, ::emitTransferProgress
-                                )
+                                    hostContext(), peer, sources
+                                ) { n, sent, total, speed ->
+                                    emitTransferProgress(n, sent, total, speed, "out")
+                                }
                             }.onSuccess { names ->
                                 resolve(
                                     id, true,
@@ -741,8 +745,14 @@ class PocketBridge(
         main.post { runCatching { webView.evaluateJavascript(script, null) } }
     }
 
-    private fun emitTransferProgress(name: String, sent: Long, total: Long) {
-        val percent = if (total > 0) ((sent * 100) / total).toInt() else 0
+    private fun emitTransferProgress(
+        name: String,
+        sent: Long,
+        total: Long,
+        speed: Long,
+        direction: String = "out"
+    ) {
+        val percent = if (total > 0) ((sent * 100) / total).toInt().coerceIn(0, 100) else 0
         TransferEvents.emit(
             "transfer.progress",
             JSONObject()
@@ -750,6 +760,8 @@ class PocketBridge(
                 .put("sent", sent)
                 .put("total", total)
                 .put("percent", percent)
+                .put("speed", speed)
+                .put("direction", direction)
         )
     }
 

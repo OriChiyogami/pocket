@@ -27,7 +27,7 @@ object TransferClient {
         context: Context,
         peer: Peer,
         sources: List<Source>,
-        onProgress: (name: String, sent: Long, total: Long) -> Unit = { _, _, _ -> }
+        onProgress: (name: String, sent: Long, total: Long, speed: Long) -> Unit = { _, _, _, _ -> }
     ): List<String> {
         if (sources.isEmpty()) throw TransferException("没有要发送的文件")
         val base = "http://${peer.host}:${peer.port}"
@@ -69,7 +69,7 @@ object TransferClient {
     private fun uploadOne(
         url: String,
         source: Source,
-        onProgress: (String, Long, Long) -> Unit
+        onProgress: (String, Long, Long, Long) -> Unit
     ) {
         val stream = source.open() ?: throw TransferException("读取不到「${source.name}」")
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -89,20 +89,31 @@ object TransferClient {
                 connection.outputStream.use { output ->
                     val buffer = ByteArray(256 * 1024)
                     var total = 0L
-                    var lastReport = 0L
+                    var lastBytes = 0L
+                    var lastTime = System.currentTimeMillis()
                     while (true) {
                         val read = input.read(buffer)
                         if (read <= 0) break
                         output.write(buffer, 0, read)
                         total += read
                         val now = System.currentTimeMillis()
-                        if (now - lastReport > 250 || (source.size > 0 && total >= source.size)) {
-                            lastReport = now
-                            onProgress(source.name, total, source.size)
+                        if (now - lastTime > 250) {
+                            val speed = (total - lastBytes) * 1000 / (now - lastTime).coerceAtLeast(1)
+                            onProgress(
+                                source.name, total,
+                                if (source.size > 0) source.size else total,
+                                speed
+                            )
+                            lastBytes = total
+                            lastTime = now
                         }
                     }
                     output.flush()
-                    onProgress(source.name, total, if (source.size > 0) source.size else total)
+                    onProgress(
+                        source.name, total,
+                        if (source.size > 0) source.size else total,
+                        0
+                    )
                 }
             }
             val code = connection.responseCode

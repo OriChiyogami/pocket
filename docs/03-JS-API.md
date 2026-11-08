@@ -442,7 +442,8 @@ if (devices.length) {
 
 ```js
 pocket.on('transfer.progress', (p) => {
-  // { name, sent, total, percent }
+  // { name, sent, total, percent, speed, direction: 'in'|'out', peer? }
+  // speed 单位：字节/秒
 });
 pocket.on('transfer.received', (data) => {
   // { file: { id, name, size, mime, direction, peer, time } }

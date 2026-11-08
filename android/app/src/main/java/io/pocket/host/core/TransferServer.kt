@@ -206,8 +206,22 @@ object TransferServer {
 
                 val info = offer.files[index]
                 val target = TransferStore.newIncomingFile(context, info.name)
+                var lastBytes = 0L
+                var lastAt = System.currentTimeMillis()
+                var lastEmit = 0L
                 val written = try {
-                    copyBody(input, headers, target)
+                    copyBody(input, headers, target) { sent ->
+                        val now = System.currentTimeMillis()
+                        if (now - lastEmit >= 250) {
+                            val speed = if (now > lastAt) {
+                                (sent - lastBytes) * 1000 / (now - lastAt).coerceAtLeast(1)
+                            } else 0
+                            lastEmit = now
+                            lastAt = now
+                            lastBytes = sent
+                            emitProgress(info.name, sent, info.size, speed, offer.fromName)
+                        }
+                    }
                 } catch (e: Throwable) {
                     runCatching { target.delete() }
                     return sendJson(output, 500, JSONObject().put("error", "写入失败：${e.message}"))
@@ -216,6 +230,7 @@ object TransferServer {
                     runCatching { target.delete() }
                     return sendJson(output, 400, JSONObject().put("error", "空文件"))
                 }
+                emitProgress(info.name, written, info.size, 0, offer.fromName)
 
                 val entry = TransferStore.add(
                     context = context,
@@ -325,20 +340,33 @@ object TransferServer {
         return start to end.coerceAtMost(total - 1)
     }
 
-    private fun copyBody(input: InputStream, headers: Map<String, String>, target: File): Long {
+    private fun copyBody(
+        input: InputStream,
+        headers: Map<String, String>,
+        target: File,
+        onProgress: (Long) -> Unit = {}
+    ): Long {
         target.parentFile?.mkdirs()
         BufferedOutputStream(FileOutputStream(target), 256 * 1024).use { output ->
             val chunked = headers["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true
             return if (chunked) {
-                copyChunked(input, output)
+                copyChunked(input, output, onProgress)
             } else {
                 val length = headers["content-length"]?.toLongOrNull() ?: -1L
-                if (length >= 0) copyLimited(input, output, length) else input.copyTo(output)
+                if (length >= 0) {
+                    copyLimited(input, output, length, onProgress)
+                } else {
+                    copyChunked(input, output, onProgress)
+                }
             }
         }
     }
 
-    private fun copyChunked(input: InputStream, output: OutputStream): Long {
+    private fun copyChunked(
+        input: InputStream,
+        output: OutputStream,
+        onProgress: (Long) -> Unit = {}
+    ): Long {
         var total = 0L
         while (true) {
             val line = readLine(input) ?: break
@@ -347,22 +375,30 @@ object TransferServer {
                 readLine(input)
                 break
             }
-            total += copyLimited(input, output, size)
+            total += copyLimited(input, output, size) { onProgress(total + it) }
             readLine(input)
         }
         return total
     }
 
-    private fun copyLimited(input: InputStream, output: OutputStream, length: Long): Long {
+    private fun copyLimited(
+        input: InputStream,
+        output: OutputStream,
+        length: Long,
+        onProgress: (Long) -> Unit = {}
+    ): Long {
         var remaining = length
+        var copied = 0L
         val buffer = ByteArray(256 * 1024)
         while (remaining > 0) {
             val read = input.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
             if (read <= 0) break
             output.write(buffer, 0, read)
             remaining -= read
+            copied += read
+            onProgress(copied)
         }
-        return length - remaining
+        return copied
     }
 
     private fun skipFully(input: InputStream, count: Long) {
@@ -473,5 +509,20 @@ object TransferServer {
     private fun expirePending() {
         val now = System.currentTimeMillis()
         pending.entries.removeAll { now - it.value.createdAt > 10 * 60 * 1000 }
+    }
+
+    private fun emitProgress(name: String, sent: Long, total: Long, speed: Long, peer: String) {
+        val percent = if (total > 0) ((sent * 100) / total).toInt().coerceIn(0, 100) else 0
+        TransferEvents.emit(
+            "transfer.progress",
+            JSONObject()
+                .put("name", name)
+                .put("sent", sent)
+                .put("total", total)
+                .put("percent", percent)
+                .put("speed", speed)
+                .put("direction", "in")
+                .put("peer", peer)
+        )
     }
 }

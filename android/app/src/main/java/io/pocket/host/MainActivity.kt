@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val updated = withContext(Dispatchers.IO) {
                 installer.ensureBuiltins("hello.pkt", "motion.pkt", "tool.pkt")
-                installer.ensureBuiltinIfMissing("transfer.pkt", "com.pocket.transfer")
+                installer.ensureBuiltinVersion("transfer.pkt", "com.pocket.transfer", "1.0.1")
                 installer.ensureBuiltinVersion("files.pkt", "com.pocket.files", "1.0.1")
                 // 电脑端上版本更高的小应用，启动时静默更新（数据保留）
                 runCatching { AutoUpdate.syncApps(this@MainActivity) }.getOrDefault(emptyList())

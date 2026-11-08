@@ -169,11 +169,22 @@
     return (bytes / 1048576).toFixed(1) + ' MB';
   }
 
-  function showProgress(name, percent) {
+  function fmtSpeed(bytesPerSec) {
+    var v = bytesPerSec || 0;
+    if (v <= 0) return '';
+    if (v < 1024) return v + ' B/s';
+    if (v < 1048576) return (v / 1024).toFixed(1) + ' KB/s';
+    return (v / 1048576).toFixed(1) + ' MB/s';
+  }
+
+  function showProgress(name, percent, speed, direction) {
     var box = document.getElementById('progress');
     box.classList.add('show');
-    document.getElementById('pName').textContent = name || '正在传输…';
-    document.getElementById('pPercent').textContent = (percent || 0) + '%';
+    var prefix = direction === 'in' ? '正在接收 ' : '正在发送 ';
+    document.getElementById('pName').textContent = prefix + (name || '…');
+    var speedText = fmtSpeed(speed);
+    document.getElementById('pPercent').textContent =
+      (percent || 0) + '%' + (speedText ? ' · ' + speedText : '');
     document.getElementById('pBar').style.width = (percent || 0) + '%';
   }
 
@@ -218,11 +229,12 @@
 
   pocket.on('transfer.progress', function (p) {
     if (!p) return;
-    showProgress(p.name, p.percent || 0);
+    showProgress(p.name, p.percent || 0, p.speed || 0, p.direction || 'out');
   });
   pocket.on('transfer.received', function (data) {
-    hideProgress();
     var name = data && data.file ? data.file.name : '';
+    showProgress(name, 100, 0, 'in');
+    setTimeout(hideProgress, 900);
     toast(name ? '收到 ' + name : '收到新文件');
     refresh();
   });
