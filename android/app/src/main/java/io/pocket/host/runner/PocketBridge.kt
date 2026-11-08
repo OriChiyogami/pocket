@@ -22,6 +22,7 @@ import androidx.core.app.NotificationCompat
 import io.pocket.host.R
 import io.pocket.host.core.AiConfig
 import io.pocket.host.core.BridgeException
+import io.pocket.host.core.ImageConfig
 import io.pocket.host.core.InstalledApp
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.core.PocketStorage
@@ -319,6 +320,69 @@ class PocketBridge(
                                 )
                             }.onFailure { e ->
                                 resolve(id, false, null, BridgeException("E_AI", e.message ?: "AI 调用失败"))
+                            }
+                        }
+                    }
+                }
+
+                "image.config" -> {
+                    val cfg = ImageConfig.load(hostContext())
+                    resolve(
+                        id, true,
+                        JSONObject()
+                            .put("available", cfg.ready())
+                            .put("model", cfg.model)
+                            .put("baseUrl", cfg.baseUrl),
+                        null
+                    )
+                }
+
+                "image.generate" -> {
+                    val prompt = params.optString("prompt", "")
+                    if (prompt.isBlank()) {
+                        resolve(id, false, null, BridgeException("E_INVALID_ARG", "prompt 不能为空"))
+                    } else {
+                        val size = params.optString("size", "auto")
+                        val quality = params.optString("quality", "auto")
+                        val count = params.optInt("count", params.optInt("n", 1))
+                        val format = params.optString(
+                            "outputFormat",
+                            params.optString("format", "png")
+                        )
+                        val refs = mutableListOf<ImageConfig.RefImage>()
+                        params.optJSONArray("images")?.let { arr ->
+                            for (i in 0 until arr.length()) {
+                                parseRefImage(arr.optString(i))?.let { refs.add(it) }
+                            }
+                        }
+                        io.execute {
+                            runCatching {
+                                ImageConfig.generate(
+                                    hostContext(), prompt, size, quality, count, format, refs
+                                )
+                            }.onSuccess { files ->
+                                val images = JSONArray()
+                                files.forEach { file ->
+                                    val mime = when (file.extension.lowercase()) {
+                                        "jpg", "jpeg" -> "image/jpeg"
+                                        "webp" -> "image/webp"
+                                        else -> "image/png"
+                                    }
+                                    images.put(
+                                        "data:$mime;base64," +
+                                            android.util.Base64.encodeToString(
+                                                file.readBytes(),
+                                                android.util.Base64.NO_WRAP
+                                            )
+                                    )
+                                }
+                                resolve(
+                                    id, true,
+                                    JSONObject().put("images", images).put("count", files.size),
+                                    null
+                                )
+                            }.onFailure { e ->
+                                resolve(id, false, null, BridgeException("E_IMAGE", e.message ?: "生图失败"))
                             }
                         }
                     }
@@ -671,6 +735,23 @@ class PocketBridge(
     private fun jsonOrNull(raw: String?): Any {
         if (raw == null) return JSONObject.NULL
         return runCatching { org.json.JSONTokener(raw).nextValue() }.getOrElse { raw }
+    }
+
+    /** 接受 data URL（data:image/png;base64,...）或纯 base64 字符串 */
+    private fun parseRefImage(raw: String): ImageConfig.RefImage? {
+        if (raw.isBlank()) return null
+        val isDataUrl = raw.startsWith("data:", ignoreCase = true)
+        val mime = if (isDataUrl) {
+            raw.substringAfter("data:").substringBefore(';').ifBlank { "image/png" }
+        } else {
+            "image/png"
+        }
+        val base64 = if (isDataUrl) raw.substringAfter(',', "") else raw
+        if (base64.isBlank()) return null
+        val bytes = runCatching {
+            android.util.Base64.decode(base64, android.util.Base64.DEFAULT)
+        }.getOrNull() ?: return null
+        return ImageConfig.RefImage(bytes, mime)
     }
 
     private fun hostContext(): Context = webView.context

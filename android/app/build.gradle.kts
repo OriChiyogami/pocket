@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// 生图 Key 不进仓库：放在 android/image-secrets.properties（已 .gitignore），构建时注入 BuildConfig
+val imageSecrets = Properties().apply {
+    val file = rootProject.file("image-secrets.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val imageApiKey = imageSecrets.getProperty("image.apiKey", "").trim()
 
 android {
     namespace = "io.pocket.host"
@@ -12,8 +21,10 @@ android {
         applicationId = "io.pocket.host"
         minSdk = 24
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.2.7"
+        versionCode = 11
+        versionName = "1.2.8"
+
+        buildConfigField("String", "IMAGE_API_KEY", "\"$imageApiKey\"")
     }
 
     signingConfigs {

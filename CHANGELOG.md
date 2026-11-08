@@ -1,5 +1,14 @@
 # 更新日志
 
+## 1.2.8
+- 手机端新增「画图」：首页右上角「画」→ 输入提示词直接生图
+- 支持参考图（最多 4 张）：有参考图时走 `POST {BaseURL}/images/edits`（multipart），无参考图走 `/images/generations`
+- 可选尺寸（自动 / 1024×1024 / 1536×1024 / 1024×1536）、质量（自动 / 低 / 中 / 高）、数量 1～4
+- 结果可「保存到相册」（`Pictures/Pocket`）或系统分享
+- 设置里新增「生图模型配置」（中转站地址 / Key / 模型名）；默认模型 `gpt-image-2.5-flare`
+- SDK：新增 `pocket.image.generate()` / `status()`，应用可通过宿主统一生图，不用自带 Key
+- 生图 Key 通过本地 `android/image-secrets.properties` 在构建时注入，**不进仓库**
+
 ## 1.2.7
 - 电脑端上传入口拆分：拖到「发给手机」只生成手机应用；拖到「本机 HTML 收藏」只存电脑端，两边不再互相串
 - 收藏的 HTML 新增「迁数据」：把原来双击直接打开时存在浏览器里的 localStorage 一次性导入

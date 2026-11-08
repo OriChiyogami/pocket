@@ -357,7 +357,50 @@ Key 只存在手机本地（SharedPreferences），不会随应用包分发。
 
 ---
 
-## 9. 事件
+## 9. 生图
+
+宿主里配置一次中转站（设置 → 生图模型），应用通过 `pocket.image` 统一调用，同样不需要自带 Key。
+手机首页右上角的「画」就是这套能力的原生界面：输入提示词、加最多 4 张参考图，生成后可保存到相册或分享。
+
+### `pocket.image.generate(options | prompt): Promise<string[]>`
+
+```js
+// 纯文生图
+const images = await pocket.image.generate('雨后的赛博朋克街道，霓虹倒影，电影感打光');
+document.querySelector('img').src = images[0]; // data:image/png;base64,...
+
+// 带参考图（改图）
+const out = await pocket.image.generate({
+  prompt: '把背景换成淡蓝色，保持主体不变',
+  images: [refDataUrl],   // Data URL 或纯 base64，最多 4 张
+  size: '1024x1024',
+  quality: 'high',
+  n: 1
+});
+```
+
+- 返回：图片 Data URL 数组（`['data:image/png;base64,...']`），顺序与接口返回一致
+- 参数：
+  - `prompt`（必填）
+  - `size`：`auto`（默认）/ `1024x1024` / `1536x1024` / `1024x1536`
+  - `quality`：`auto`（默认）/ `low` / `medium` / `high`
+  - `n`：1～4，默认 1
+  - `format`：`png`（默认）/ `jpeg` / `webp`
+  - `images`：参考图数组；为空走 `POST {BaseURL}/images/generations`，非空走 `POST {BaseURL}/images/edits`（multipart）
+- 失败：Promise reject，`err.code = 'E_IMAGE'`
+- 超时：连接 20 秒、读取 300 秒；大图常见 30～90 秒，页面里请给 loading 态
+- 同样不需要在 `manifest.permissions` 里声明
+
+### `pocket.image.status(): Promise<{ available, model, baseUrl }>`
+
+```js
+const st = await pocket.image.status();
+if (!st.available) { /* 引导用户去 设置 → 生图模型 */ }
+```
+
+---
+
+## 10. 事件
 
 ```js
 pocket.on('back', () => {
@@ -380,7 +423,7 @@ pocket.on('back', () => {
 
 ---
 
-## 8. 错误码
+## 11. 错误码
 
 | code | 含义 |
 |---|---|
@@ -391,11 +434,13 @@ pocket.on('back', () => {
 | `E_NO_METHOD` | 未知方法 |
 | `E_QUOTA` | 存储超限 |
 | `E_CANCELLED` | 用户取消（`file.pick` 会转成 `null`，不会抛） |
+| `E_AI` | AI 对话失败（接口状态码 / 额度 / 模型名） |
+| `E_IMAGE` | 生图失败（接口状态码 / 额度 / 模型名） |
 | `E_NO_BRIDGE` | 页面不在口袋容器内（例如用浏览器直接打开） |
 | `E_INTERNAL` | 宿主内部异常 |
 
 ---
 
-## 9. 类型声明
+## 12. 类型声明
 
 完整 TypeScript 声明见 `sdk/types/pocket.d.ts`。

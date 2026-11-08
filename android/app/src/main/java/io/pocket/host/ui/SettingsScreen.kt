@@ -40,6 +40,8 @@ fun SettingsScreen(
     onCheckUpdate: () -> Unit,
     onOpenAi: () -> Unit,
     aiSummary: String,
+    onOpenImage: () -> Unit,
+    imageSummary: String,
     modifier: Modifier = Modifier
 ) {
     val totalBytes = apps.sumOf { it.sizeBytes }
@@ -98,6 +100,32 @@ fun SettingsScreen(
                     text = if (aiSummary.isBlank() || aiSummary == "未配置")
                         "DeepSeek 只需填 Key；也支持 OpenAI 兼容的中转站。应用可通过 pocket.ai.chat 统一调用"
                     else "$aiSummary · 应用可通过 pocket.ai.chat 统一调用",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                .clickable(onClick = onOpenImage)
+                .padding(16.dp)
+        ) {
+            Column {
+                Text(
+                    text = "生图模型配置",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = if (imageSummary.isBlank() || imageSummary == "未配置")
+                        "填中转站地址和 Key，就能在首页「画」里用提示词生图"
+                    else "$imageSummary · 首页「画」可直接使用",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

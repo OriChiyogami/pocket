@@ -35,6 +35,7 @@ import io.pocket.host.core.PackageInstaller
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.runner.AppRunnerActivity
 import io.pocket.host.core.AiConfig
+import io.pocket.host.core.ImageConfig
 import io.pocket.host.ui.AiChatScreen
 import io.pocket.host.ui.AiSettingsSheet
 import io.pocket.host.ui.AppDetailSheet
@@ -42,6 +43,8 @@ import io.pocket.host.ui.FolderPickerDialog
 import io.pocket.host.ui.FolderScreen
 import io.pocket.host.ui.HomeScreen
 import io.pocket.host.ui.HostUpdateSheet
+import io.pocket.host.ui.ImageGenScreen
+import io.pocket.host.ui.ImageSettingsSheet
 import io.pocket.host.ui.ImportSheet
 import io.pocket.host.ui.LanImportSheet
 import io.pocket.host.ui.PasteHtmlDialog
@@ -72,6 +75,9 @@ class MainActivity : ComponentActivity() {
     private var aiSettingsOpen by mutableStateOf(false)
     private var aiChatOpen by mutableStateOf(false)
     private var aiSummary by mutableStateOf("")
+    private var imageGenOpen by mutableStateOf(false)
+    private var imageSettingsOpen by mutableStateOf(false)
+    private var imageSummary by mutableStateOf("")
 
     private val importPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { importUri(it) }
@@ -85,6 +91,7 @@ class MainActivity : ComponentActivity() {
         repo = app.repository
         installer = app.installer
         aiSummary = AiConfig.load(this).summary()
+        imageSummary = ImageConfig.load(this).summary()
 
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
@@ -111,6 +118,8 @@ class MainActivity : ComponentActivity() {
                             onCheckUpdate = { updateSheetOpen = true },
                             onOpenAi = { aiSettingsOpen = true },
                             aiSummary = aiSummary,
+                            onOpenImage = { imageSettingsOpen = true },
+                            imageSummary = imageSummary,
                             modifier = Modifier.systemBarsPadding()
                         )
                     } else if (folderScreen != null) {
@@ -140,6 +149,7 @@ class MainActivity : ComponentActivity() {
                             onAdd = { importSheetOpen = true },
                             onSettings = { settingsOpen = true },
                             onAi = { aiChatOpen = true },
+                            onDraw = { imageGenOpen = true },
                             modifier = Modifier.systemBarsPadding()
                         )
                     }
@@ -229,6 +239,21 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (imageGenOpen) {
+                    ImageGenScreen(
+                        onBack = { imageGenOpen = false },
+                        onOpenSettings = { imageSettingsOpen = true },
+                        imageSummary = imageSummary
+                    )
+                }
+
+                if (imageSettingsOpen) {
+                    ImageSettingsSheet(
+                        onDismiss = { imageSettingsOpen = false },
+                        onSaved = { imageSummary = ImageConfig.load(this@MainActivity).summary() }
+                    )
+                }
+
                 if (detailApp != null) {
                     AppDetailSheet(
                         app = detailApp,
@@ -305,8 +330,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                BackHandler(enabled = settingsOpen || folderScreen != null || aiChatOpen) {
-                    if (aiChatOpen) {
+                BackHandler(enabled = settingsOpen || folderScreen != null || aiChatOpen || imageGenOpen) {
+                    if (imageGenOpen) {
+                        imageGenOpen = false
+                    } else if (aiChatOpen) {
                         aiChatOpen = false
                     } else if (folderScreen != null) {
                         folderScreen = null

@@ -3,6 +3,7 @@
 .gradle/
 **/build/
 android/local.properties
+android/image-secrets.properties
 
 # 产物
 dist/*.apk

@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.pocket.host.core.InstalledApp
 import io.pocket.host.core.iconPathOf
+import io.pocket.host.ui.theme.PocketPink
 import io.pocket.host.ui.theme.PocketPurple
 import io.pocket.host.ui.theme.parseAccent
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +64,7 @@ fun HomeScreen(
     onAdd: () -> Unit,
     onSettings: () -> Unit,
     onAi: () -> Unit,
+    onDraw: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val looseApps = apps.filter { it.folder.isNullOrEmpty() }
@@ -98,6 +100,22 @@ fun HomeScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         letterSpacing = 0.4.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(PocketPink.copy(alpha = 0.16f))
+                        .clickable(onClick = onDraw),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "画",
+                        color = PocketPink,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium
                     )
                 }
                 Box(

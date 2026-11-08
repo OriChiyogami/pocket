@@ -77,6 +77,16 @@ declare namespace Pocket {
     dataUrl: string;
   }
 
+  interface ImageOptions {
+    prompt: string;
+    size?: 'auto' | '1024x1024' | '1536x1024' | '1024x1536';
+    quality?: 'auto' | 'low' | 'medium' | 'high';
+    n?: number;
+    format?: 'png' | 'jpeg' | 'webp';
+    /** 参考图：Data URL 或纯 base64，最多 4 张；有值时走改图接口 */
+    images?: string[];
+  }
+
   interface PocketError extends Error {
     code:
       | 'E_PERMISSION'
@@ -86,6 +96,8 @@ declare namespace Pocket {
       | 'E_NO_METHOD'
       | 'E_QUOTA'
       | 'E_CANCELLED'
+      | 'E_AI'
+      | 'E_IMAGE'
       | 'E_NO_BRIDGE'
       | 'E_INTERNAL';
     isPocketError: true;
@@ -188,6 +200,12 @@ declare const pocket: {
   notify: {
     show(options: { title?: string; body?: string }): Promise<void>;
     show(title: string, body?: string): Promise<void>;
+  };
+
+  image: {
+    status(): Promise<{ available: boolean; model: string; baseUrl: string }>;
+    generate(options: Pocket.ImageOptions): Promise<string[]>;
+    generate(prompt: string): Promise<string[]>;
   };
 
   system: {

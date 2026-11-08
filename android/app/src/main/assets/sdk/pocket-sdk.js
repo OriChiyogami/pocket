@@ -35,6 +35,7 @@
     'system.openExternal': 1,
     'http.request': 1,
     'ai.chat': 1,
+    'image.generate': 1,
     'tts.speak': 1,
     'tts.stop': 1,
     'tts.available': 1
@@ -383,6 +384,34 @@
         }).then(function (r) {
           return { text: (r && r.text) || '', reasoning: (r && r.reasoning) || '' };
         });
+      }
+    },
+
+    /* ---- 生图（统一走宿主里配置的中转站，应用不用自带 Key） ---- */
+    image: {
+      /** 当前是否可用：{ available, model, baseUrl } */
+      status: function () { return invoke('image.config'); },
+
+      /**
+       * 生图，返回图片 Data URL 数组：['data:image/png;base64,...']。
+       * generate('一只戴墨镜的猫')
+       * generate({ prompt, size, quality, n, format, images })
+       *   size:    'auto' | '1024x1024' | '1536x1024' | '1024x1536'
+       *   quality: 'auto' | 'low' | 'medium' | 'high'
+       *   n:       1 ~ 4
+       *   format:  'png' | 'jpeg' | 'webp'
+       *   images:  参考图（Data URL 或纯 base64 数组），有参考图时走改图接口
+       */
+      generate: function (a, b) {
+        var opts = typeof a === 'string' ? { prompt: a } : (a || {});
+        return invoke('image.generate', {
+          prompt: String(opts.prompt == null ? '' : opts.prompt),
+          size: opts.size || 'auto',
+          quality: opts.quality || 'auto',
+          count: opts.n || opts.count || 1,
+          outputFormat: opts.format || opts.outputFormat || 'png',
+          images: opts.images || opts.refs || []
+        }).then(function (r) { return (r && r.images) ? r.images : []; });
       }
     },
 
