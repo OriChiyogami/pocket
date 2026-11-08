@@ -21,8 +21,8 @@ android {
         applicationId = "io.pocket.host"
         minSdk = 24
         targetSdk = 34
-        versionCode = 14
-        versionName = "1.3.2"
+        versionCode = 15
+        versionName = "1.3.3"
 
         buildConfigField("String", "IMAGE_API_KEY", "\"$imageApiKey\"")
     }
