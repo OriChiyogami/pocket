@@ -35,6 +35,7 @@ import io.pocket.host.core.PackageInstaller
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.runner.AppRunnerActivity
 import io.pocket.host.core.AiConfig
+import io.pocket.host.core.AutoUpdate
 import io.pocket.host.core.ImageConfig
 import io.pocket.host.ui.AiChatScreen
 import io.pocket.host.ui.AiSettingsSheet
@@ -78,6 +79,7 @@ class MainActivity : ComponentActivity() {
     private var imageGenOpen by mutableStateOf(false)
     private var imageSettingsOpen by mutableStateOf(false)
     private var imageSummary by mutableStateOf("")
+    private var autoSyncOn by mutableStateOf(true)
 
     private val importPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let { importUri(it) }
@@ -92,12 +94,18 @@ class MainActivity : ComponentActivity() {
         installer = app.installer
         aiSummary = AiConfig.load(this).summary()
         imageSummary = ImageConfig.load(this).summary()
+        autoSyncOn = AutoUpdate.enabled(this)
 
         lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
+            val updated = withContext(Dispatchers.IO) {
                 installer.ensureBuiltins("hello.pkt", "motion.pkt", "tool.pkt")
                 installer.ensureBuiltinIfMissing("transfer.pkt", "com.pocket.transfer")
                 installer.ensureBuiltinIfMissing("files.pkt", "com.pocket.files")
+                // 电脑端上版本更高的小应用，启动时静默更新（数据保留）
+                runCatching { AutoUpdate.syncApps(this@MainActivity) }.getOrDefault(emptyList())
+            }
+            if (updated.isNotEmpty()) {
+                toast("已自动更新：" + updated.joinToString("、"))
             }
         }
 
@@ -122,6 +130,11 @@ class MainActivity : ComponentActivity() {
                             aiSummary = aiSummary,
                             onOpenImage = { imageSettingsOpen = true },
                             imageSummary = imageSummary,
+                            autoSync = autoSyncOn,
+                            onToggleAutoSync = { value ->
+                                autoSyncOn = value
+                                AutoUpdate.setEnabled(this@MainActivity, value)
+                            },
                             modifier = Modifier.systemBarsPadding()
                         )
                     } else if (folderScreen != null) {

@@ -368,6 +368,7 @@ function renderPage(options) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" type="image/png" href="/favicon.png">
 <title>口袋 · 电脑端</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -384,6 +385,8 @@ function renderPage(options) {
       radial-gradient(34% 24% at 96% 4%, rgba(255,107,157,.12), transparent 70%);
   }
   .wrap { position: relative; max-width: 900px; margin: 0 auto; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brandLogo { width: 46px; height: 46px; border-radius: 13px; box-shadow: 0 6px 18px rgba(20,18,28,.28); }
   header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
   h1 { font-size: 34px; letter-spacing: -1px; font-weight: 800; }
   h1 em { font-style: normal; background: linear-gradient(120deg,#7C5CFF,#FF6B9D); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -481,7 +484,10 @@ function renderPage(options) {
 <div class="wrap">
   <header>
     <div>
-      <h1>口袋 <em>电脑端</em></h1>
+      <div class="brand">
+        <img class="brandLogo" src="/favicon.png" alt="">
+        <h1>口袋 <em>电脑端</em></h1>
+      </div>
       <p class="sub">${escapeHtml(name)} · ${escapeHtml(os.hostname())}</p>
     </div>
     <div class="headRight">
@@ -1032,6 +1038,23 @@ function startServer(options) {
     const pathname = decodeURIComponent(url.pathname);
 
     try {
+      if (pathname === '/favicon.png' || pathname === '/favicon.ico') {
+        const icon = path.resolve(__dirname, '..', '..', 'tools', 'pocket.png');
+        try {
+          const data = fs.readFileSync(icon);
+          res.writeHead(200, {
+            'Content-Type': 'image/png',
+            'Cache-Control': 'max-age=3600',
+            'Content-Length': data.length
+          });
+          res.end(data);
+        } catch (e) {
+          res.writeHead(404);
+          res.end();
+        }
+        return;
+      }
+
       if (pathname === '/' || pathname === '/index.html') {
         const apps = scanLibrary(dir);
         const html = renderPage({

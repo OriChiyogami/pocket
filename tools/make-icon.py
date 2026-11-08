@@ -1,32 +1,43 @@
-"""生成口袋电脑端快捷方式图标：tools/pocket.ico"""
-from PIL import Image, ImageDraw
+"""从 tools/logo-source.png 生成手机与电脑端图标。
 
-S = 1024
-top = (255, 126, 179)
-bottom = (255, 77, 141)
+用法：python tools/make-icon.py
+产物：
+  tools/pocket.png                 电脑端页面 LOGO / favicon
+  tools/pocket.ico                 桌面快捷方式图标
+  android/.../mipmap-*/ic_launcher.png       旧版图标（API < 26）
+  android/.../mipmap-*/ic_launcher_bg.png    自适应图标背景（API 26+）
+"""
+import os
+from PIL import Image
 
-img = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+SRC = "tools/logo-source.png"
+# 只取 P 主体，避开下方的 pocket 文字
+CROP = (267, 145, 797, 675)
+SIZE = 1024
 
-grad = Image.new("RGB", (1, S))
-for y in range(S):
-    t = y / (S - 1)
-    grad.putpixel((0, y), tuple(int(top[i] * (1 - t) + bottom[i] * t) for i in range(3)))
-grad = grad.resize((S, S))
+src = Image.open(SRC).convert("RGB")
+crop = src.crop(CROP)
 
-mask = Image.new("L", (S, S), 0)
-ImageDraw.Draw(mask).rounded_rectangle([0, 0, S - 1, S - 1], radius=232, fill=255)
-img.paste(grad, (0, 0), mask)
+# 直接用整块裁剪铺满：背景自带黑色与光晕，不会出现拼接的方块边
+canvas = crop.resize((SIZE, SIZE), Image.LANCZOS)
 
-d = ImageDraw.Draw(img)
-white = (255, 255, 255, 255)
-# 口袋本体
-d.rounded_rectangle([258, 404, 766, 780], radius=70, fill=white)
-# 口袋开口的浅色阴影
-d.rounded_rectangle([258, 404, 766, 466], radius=36, fill=(255, 236, 244, 255))
-# 上方小圆点
-d.ellipse([470, 262, 554, 346], fill=white)
+# 电脑端
+canvas.resize((512, 512), Image.LANCZOS).save("tools/pocket.png")
+canvas.resize((256, 256), Image.LANCZOS).save(
+    "tools/pocket.ico",
+    sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)],
+)
 
-img.save("tools/pocket.png")
-sizes = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
-img.resize((256, 256), Image.LANCZOS).save("tools/pocket.ico", sizes=sizes)
+# 手机端
+RES = "android/app/src/main/res"
+DENSITIES = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
+for name, size in DENSITIES.items():
+    folder = os.path.join(RES, "mipmap-" + name)
+    os.makedirs(folder, exist_ok=True)
+    canvas.resize((size, size), Image.LANCZOS).save(os.path.join(folder, "ic_launcher.png"))
+    adaptive = int(round(size * 108 / 48))
+    canvas.resize((adaptive, adaptive), Image.LANCZOS).save(
+        os.path.join(folder, "ic_launcher_bg.png")
+    )
+
 print("ok")

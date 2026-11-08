@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -42,6 +43,8 @@ fun SettingsScreen(
     aiSummary: String,
     onOpenImage: () -> Unit,
     imageSummary: String,
+    autoSync: Boolean,
+    onToggleAutoSync: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val totalBytes = apps.sumOf { it.sizeBytes }
@@ -182,6 +185,32 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(18.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f))
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "启动时自动同步小应用",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "电脑端上有新版本时后台静默装好，应用数据保留；宿主 App 本身受系统限制仍需手动安装",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.size(10.dp))
+            Switch(checked = autoSync, onCheckedChange = onToggleAutoSync)
         }
 
         Spacer(modifier = Modifier.height(20.dp))
