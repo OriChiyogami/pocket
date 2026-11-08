@@ -29,5 +29,5 @@ Thumbs.db
 *.jks
 *.keystore
 
-# 日志
-*.log
+# 生成物
+tools/pocket-*.ico
