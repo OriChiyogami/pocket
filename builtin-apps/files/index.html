@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>口袋文件</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: #F7F6FA; color: #14121C; min-height: 100vh;
+    padding: calc(var(--pocket-safe-top, 0px) + 18px) 16px calc(var(--pocket-safe-bottom, 0px) + 28px);
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0C0B10; color: #F2F0F7; }
+    .card, .item, .tab, .search { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.09); }
+    .meta, .hint { color: #9C97B0; }
+  }
+  header { margin-bottom: 14px; }
+  h1 { font-size: 28px; letter-spacing: -.6px; }
+  h1 em { font-style: normal; background: linear-gradient(120deg,#7C5CFF,#22B8CF); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hint { font-size: 11.5px; color: #8E89A3; margin-top: 5px; line-height: 1.55; }
+
+  .tabs { display: flex; gap: 8px; margin: 16px 0 12px; }
+  .tab {
+    border: 1px solid rgba(0,0,0,.05); background: rgba(255,255,255,.85); color: #6B6780;
+    border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 12.5px; font-weight: 600;
+  }
+  .tab.on { background: #7C5CFF; border-color: #7C5CFF; color: #fff; }
+
+  .search {
+    width: 100%; border: 1px solid rgba(0,0,0,.06); background: rgba(255,255,255,.85);
+    border-radius: 14px; padding: 11px 14px; font: inherit; font-size: 13px; color: inherit; outline: none;
+  }
+  .search::placeholder { color: #A8A3B8; }
+
+  .list { margin-top: 12px; }
+  .item {
+    display: flex; align-items: center; gap: 12px; padding: 11px 12px; margin-bottom: 8px;
+    background: rgba(255,255,255,.86); border: 1px solid rgba(0,0,0,.05); border-radius: 16px;
+  }
+  .thumb, .ext {
+    width: 44px; height: 44px; border-radius: 12px; flex: none;
+    background: linear-gradient(135deg, rgba(124,92,255,.16), rgba(34,184,207,.16));
+    display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #5B43C9; overflow: hidden;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .meta { flex: 1; min-width: 0; }
+  .meta strong { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta span { display: block; font-size: 11px; color: #8E89A3; margin-top: 3px; }
+  .more { border: none; background: rgba(0,0,0,.05); color: #6B6780; width: 32px; height: 32px; border-radius: 50%; font-size: 16px; line-height: 1; }
+
+  .empty {
+    border: 1px dashed rgba(124,92,255,.35); background: rgba(124,92,255,.05);
+    border-radius: 18px; padding: 30px 18px; text-align: center;
+  }
+  .empty .icon { font-size: 28px; margin-bottom: 8px; }
+  .empty p { font-size: 11.5px; color: #8E89A3; margin-top: 6px; line-height: 1.6; }
+
+  .sheet {
+    position: fixed; inset: 0; z-index: 30; background: rgba(12,11,16,.55);
+    display: none; align-items: flex-end;
+  }
+  .sheet.show { display: flex; }
+  .sheetBody {
+    width: 100%; max-height: 88vh; overflow: auto; background: #fff; color: #14121C;
+    border-radius: 24px 24px 0 0; padding: 16px 16px calc(var(--pocket-safe-bottom, 0px) + 18px);
+  }
+  .sheetHead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .sheetHead strong { flex: 1; font-size: 14px; word-break: break-all; }
+  .sheetHead button { border: none; background: rgba(0,0,0,.06); border-radius: 50%; width: 32px; height: 32px; font-size: 16px; }
+  .preview img, .preview video { width: 100%; max-height: 62vh; object-fit: contain; border-radius: 14px; background: #000; }
+  .preview audio { width: 100%; margin-top: 10px; }
+  .preview pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.65; max-height: 56vh; overflow: auto; }
+  .noPreview { text-align: center; color: #6B6780; padding: 30px 0; font-size: 13px; }
+  .noPreview button { margin-top: 14px; border: none; background: #7C5CFF; color: #fff; border-radius: 12px; padding: 10px 16px; font: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <h1>口袋 <em>文件</em></h1>
+  <div class="hint">这里只放「互传」收发的文件，和系统相册/下载分开存；需要给别的 App 用时点「保存」。</div>
+</header>
+
+<div class="tabs">
+  <button class="tab on" data-tab="">全部</button>
+  <button class="tab" data-tab="in">收到</button>
+  <button class="tab" data-tab="out">发出</button>
+</div>
+
+<input class="search" id="search" placeholder="搜索文件名" autocomplete="off">
+
+<div class="list" id="list"></div>
+
+<div class="sheet" id="sheet">
+  <div class="sheetBody">
+    <div class="sheetHead"><strong id="sheetTitle"></strong><button id="sheetClose">✕</button></div>
+    <div class="preview" id="previewBody"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var items = [];
+  var tab = '';
+  var keyword = '';
+
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function toast(text) { if (text) pocket.ui.toast(text); }
+
+  function fmtSize(bytes) {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
+    return (bytes / 1073741824).toFixed(2) + ' GB';
+  }
+
+  function fmtTime(ms) {
+    var d = new Date(ms || 0);
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return (d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function extOf(name) {
+    var dot = String(name || '').lastIndexOf('.');
+    return dot > 0 ? name.slice(dot + 1).toUpperCase().slice(0, 4) : 'FILE';
+  }
+
+  function isImage(f) {
+    return (f.mime || '').indexOf('image/') === 0 ||
+      /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name || '');
+  }
+
+  function isText(f) {
+    return (f.mime || '').indexOf('text/') === 0 ||
+      /\.(txt|md|json|js|css|html?|xml|csv|log)$/i.test(f.name || '');
+  }
+
+  function isVideo(f) { return (f.mime || '').indexOf('video/') === 0 || /\.(mp4|webm|mov)$/i.test(f.name || ''); }
+  function isAudio(f) { return (f.mime || '').indexOf('audio/') === 0 || /\.(mp3|m4a|wav|ogg|flac)$/i.test(f.name || ''); }
+
+  function visible() {
+    var list = items;
+    if (keyword) {
+      var q = keyword.toLowerCase();
+      list = list.filter(function (f) { return (f.name || '').toLowerCase().indexOf(q) >= 0; });
+    }
+    return list;
+  }
+
+  function render() {
+    var box = document.getElementById('list');
+    var list = visible();
+    if (!list.length) {
+      box.innerHTML = '<div class="empty"><div class="icon">▤</div><strong>' +
+        (keyword ? '没有匹配的文件' : '还没有文件') + '</strong>' +
+        '<p>' + (keyword ? '换个关键词试试' : '在「互传」里收发过的文件会出现在这里') + '</p></div>';
+      return;
+    }
+    box.innerHTML = list.map(function (f) {
+      var thumb = isImage(f)
+        ? '<div class="thumb"><img src="' + pocket.files.url(f.id) + '" loading="lazy" alt=""></div>'
+        : '<div class="ext">' + esc(extOf(f.name)) + '</div>';
+      return '<div class="item" data-id="' + esc(f.id) + '">' + thumb +
+        '<div class="meta"><strong>' + esc(f.name) + '</strong>' +
+        '<span>' + fmtSize(f.size) + ' · ' + (f.direction === 'out' ? '发出' : '收到') +
+        (f.peer ? ' · ' + esc(f.peer) : '') + ' · ' + fmtTime(f.time) + '</span></div>' +
+        '<button class="more" data-more>⋯</button></div>';
+    }).join('');
+  }
+
+  async function load() {
+    try {
+      items = await pocket.files.list({ direction: tab });
+      render();
+    } catch (e) {
+      toast(e.message || '读取失败');
+    }
+  }
+
+  function openSheet(title, html) {
+    document.getElementById('sheetTitle').textContent = title;
+    document.getElementById('previewBody').innerHTML = html;
+    document.getElementById('sheet').classList.add('show');
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet').classList.remove('show');
+    document.getElementById('previewBody').innerHTML = '';
+  }
+
+  function preview(f) {
+    var url = pocket.files.url(f.id);
+    if (isImage(f)) {
+      openSheet(f.name, '<img src="' + url + '" alt="">');
+    } else if (isVideo(f)) {
+      openSheet(f.name, '<video src="' + url + '" controls autoplay playsinline></video>');
+    } else if (isAudio(f)) {
+      openSheet(f.name, '<div class="hint" style="margin-bottom:8px">' + esc(f.name) + '</div>' +
+        '<audio src="' + url + '" controls autoplay></audio>');
+    } else if (isText(f)) {
+      openSheet(f.name, '<pre id="previewText">加载中…</pre>');
+      fetch(url).then(function (r) { return r.text(); }).then(function (text) {
+        var node = document.getElementById('previewText');
+        if (node) node.textContent = text.slice(0, 300000);
+      }).catch(function () {
+        var node = document.getElementById('previewText');
+        if (node) node.textContent = '读取失败';
+      });
+    } else {
+      openSheet(f.name, '<div class="noPreview">这个格式没法直接预览' +
+        '<br><button id="saveFromPreview">保存到系统下载</button></div>');
+      document.getElementById('saveFromPreview').addEventListener('click', function () {
+        save(f);
+        closeSheet();
+      });
+    }
+  }
+
+  async function save(f) {
+    try {
+      var r = await pocket.files.save(f.id);
+      toast('已保存到 ' + (r && r.path ? r.path : '下载/Pocket'));
+    } catch (e) {
+      toast(e.message || '保存失败');
+    }
+  }
+
+  async function rename(f) {
+    var next = await pocket.ui.prompt({
+      title: '重命名',
+      message: '不用带路径，扩展名建议保留',
+      value: f.name
+    });
+    if (!next || next === f.name) return;
+    try {
+      await pocket.files.rename(f.id, next);
+      toast('已重命名');
+      load();
+    } catch (e) {
+      toast(e.message || '重命名失败');
+    }
+  }
+
+  async function remove(f) {
+    var ok = await pocket.ui.confirm({
+      title: '删除文件',
+      message: '「' + f.name + '」会从口袋里删除，无法恢复。',
+      okText: '删除',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+    try {
+      await pocket.files.remove(f.id);
+      toast('已删除');
+      load();
+    } catch (e) {
+      toast(e.message || '删除失败');
+    }
+  }
+
+  async function sendToDevice(f) {
+    var devices = await pocket.transfer.devices();
+    if (!devices.length) return toast('没发现设备，先打开对端口袋');
+    var idx = await pocket.ui.actionSheet({
+      title: '发送到',
+      items: devices.map(function (d) { return d.name + ' · ' + d.host; })
+    });
+    if (idx === null || idx === undefined) return;
+    var device = devices[idx];
+    openSheet(f.name, '<div class="noPreview">正在发送…</div>');
+    try {
+      await pocket.transfer.sendStored(device.id, [f.id]);
+      closeSheet();
+      toast('已发送到 ' + device.name);
+    } catch (e) {
+      closeSheet();
+      toast(e.message || '发送失败');
+    }
+  }
+
+  async function actions(f) {
+    var idx = await pocket.ui.actionSheet({
+      title: f.name,
+      items: ['预览', '保存到系统下载', '发送到设备', '重命名', '删除'],
+      cancelText: '取消'
+    });
+    if (idx === null || idx === undefined) return;
+    if (idx === 0) preview(f);
+    else if (idx === 1) save(f);
+    else if (idx === 2) sendToDevice(f);
+    else if (idx === 3) rename(f);
+    else if (idx === 4) remove(f);
+  }
+
+  document.getElementById('list').addEventListener('click', function (e) {
+    var more = e.target.closest ? e.target.closest('[data-more]') : null;
+    var item = e.target.closest ? e.target.closest('[data-id]') : null;
+    if (!item) return;
+    var f = items.filter(function (x) { return x.id === item.getAttribute('data-id'); })[0];
+    if (!f) return;
+    if (more) actions(f); else preview(f);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('on'); });
+      btn.classList.add('on');
+      tab = btn.getAttribute('data-tab');
+      load();
+    });
+  });
+
+  document.getElementById('search').addEventListener('input', function (e) {
+    keyword = e.target.value.trim();
+    render();
+  });
+
+  document.getElementById('sheetClose').addEventListener('click', closeSheet);
+  document.getElementById('sheet').addEventListener('click', function (e) {
+    if (e.target === e.currentTarget) closeSheet();
+  });
+
+  pocket.on('transfer.received', function () { load(); });
+  load();
+})();
+</script>
+</body>
+</html>

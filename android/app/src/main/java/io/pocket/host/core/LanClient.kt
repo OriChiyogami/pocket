@@ -65,6 +65,8 @@ object LanClient {
                     val text = String(packet.data, 0, packet.length)
                     val json = runCatching { JSONObject(text) }.getOrNull() ?: continue
                     if (json.optString("service") != "pocket") continue
+                    // 手机也会回应发现包，但它们不是「电脑端」，不能出现在导入列表里
+                    if (json.optString("platform") == "android") continue
                     val host = json.optString("host").ifEmpty { packet.address.hostAddress }
                     val httpPort = json.optInt("port", DEFAULT_PORT)
                     val name = json.optString("name", "我的电脑")

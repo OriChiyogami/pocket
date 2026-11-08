@@ -87,6 +87,25 @@ declare namespace Pocket {
     images?: string[];
   }
 
+  interface TransferFile {
+    id: string;
+    name: string;
+    size: number;
+    mime: string;
+    direction: 'in' | 'out';
+    peer: string;
+    time: number;
+  }
+
+  interface TransferPeer {
+    id: string;
+    name: string;
+    platform: 'android' | 'windows' | 'unknown';
+    host: string;
+    port: number;
+    lastSeen: number;
+  }
+
   interface PocketError extends Error {
     code:
       | 'E_PERMISSION'
@@ -98,6 +117,9 @@ declare namespace Pocket {
       | 'E_CANCELLED'
       | 'E_AI'
       | 'E_IMAGE'
+      | 'E_TRANSFER'
+      | 'E_NOT_FOUND'
+      | 'E_IO'
       | 'E_NO_BRIDGE'
       | 'E_INTERNAL';
     isPocketError: true;
@@ -206,6 +228,28 @@ declare const pocket: {
     status(): Promise<{ available: boolean; model: string; baseUrl: string }>;
     generate(options: Pocket.ImageOptions): Promise<string[]>;
     generate(prompt: string): Promise<string[]>;
+  };
+
+  files: {
+    list(options?: { direction?: '' | 'in' | 'out' }): Promise<Pocket.TransferFile[]>;
+    rename(id: string, name: string): Promise<Pocket.TransferFile>;
+    remove(ids: string | string[]): Promise<{ ok: boolean; deleted: number }>;
+    save(id: string): Promise<{ ok: boolean; path: string }>;
+    url(id: string): string;
+  };
+
+  transfer: {
+    status(): Promise<{
+      running: boolean;
+      port: number;
+      ip: string;
+      deviceId: string;
+      deviceName: string;
+      peers: number;
+    }>;
+    devices(): Promise<Pocket.TransferPeer[]>;
+    pickAndSend(deviceId: string): Promise<{ ok: boolean; sent: string[] }>;
+    sendStored(deviceId: string, ids: string | string[]): Promise<{ ok: boolean; sent: string[] }>;
   };
 
   system: {

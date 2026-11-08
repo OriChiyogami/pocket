@@ -96,6 +96,8 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 installer.ensureBuiltins("hello.pkt", "motion.pkt", "tool.pkt")
+                installer.ensureBuiltinIfMissing("transfer.pkt", "com.pocket.transfer")
+                installer.ensureBuiltinIfMissing("files.pkt", "com.pocket.files")
             }
         }
 
@@ -427,7 +429,8 @@ class MainActivity : ComponentActivity() {
         busy = true
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
-                listOf("hello.pkt", "motion.pkt", "tool.pkt").forEach { installer.installBuiltin(it) }
+                listOf("hello.pkt", "motion.pkt", "tool.pkt", "transfer.pkt", "files.pkt")
+                    .forEach { installer.installBuiltin(it) }
             }
             busy = false
             toast("示例应用已就绪")

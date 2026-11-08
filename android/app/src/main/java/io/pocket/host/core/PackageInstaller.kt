@@ -179,6 +179,11 @@ class PackageInstaller(
         repo.markBuiltinsInstalled()
     }
 
+    /** 新版本追加的内置应用：老用户没装过才补装。 */
+    fun ensureBuiltinIfMissing(assetName: String, id: String) {
+        if (repo.get(id) == null) installBuiltin(assetName)
+    }
+
     private fun findPackageRoot(unpackDir: File): File? {
         if (File(unpackDir, "manifest.json").isFile) return unpackDir
         val children = unpackDir.listFiles()?.filter { it.isDirectory } ?: return null

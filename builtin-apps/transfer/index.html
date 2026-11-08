@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>互传</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    background: #F7F6FA; color: #14121C; min-height: 100vh;
+    padding: calc(var(--pocket-safe-top, 0px) + 18px) 18px calc(var(--pocket-safe-bottom, 0px) + 28px);
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #0C0B10; color: #F2F0F7; }
+    .card, .device { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.09); }
+    .sub, .hint { color: #9C97B0; }
+  }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h1 { font-size: 28px; letter-spacing: -.6px; }
+  h1 em { font-style: normal; background: linear-gradient(120deg,#22B8CF,#7C5CFF); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { font-size: 12px; color: #6B6780; margin-top: 4px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #C7C3D4; display: inline-block; margin-right: 6px; }
+  .dot.on { background: #2ED573; box-shadow: 0 0 8px rgba(46,213,115,.7); }
+
+  .card {
+    background: rgba(255,255,255,.86); border: 1px solid rgba(0,0,0,.05);
+    border-radius: 20px; padding: 14px 16px; margin-bottom: 12px;
+  }
+  .statusRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .statusRow strong { font-size: 15px; }
+  .addr { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: #0E7490; }
+  .hint { font-size: 11.5px; color: #8E89A3; margin-top: 8px; line-height: 1.55; }
+
+  .section { font-size: 11px; letter-spacing: 1.2px; color: #8E89A3; font-weight: 700; margin: 20px 4px 10px; display: flex; align-items: center; gap: 8px; }
+  .section span.count { background: rgba(34,184,207,.14); color: #0E7490; padding: 2px 8px; border-radius: 999px; letter-spacing: 0; }
+  .hintInline { margin-left: auto; font-size: 11px; font-weight: 500; letter-spacing: 0; color: #A8A3B8; }
+
+  .device {
+    width: 100%; display: flex; align-items: center; gap: 13px; text-align: left;
+    background: rgba(255,255,255,.9); border: 1px solid rgba(0,0,0,.05);
+    border-radius: 18px; padding: 13px 14px; margin-bottom: 10px; font: inherit; color: inherit;
+    transition: transform .12s ease;
+  }
+  .device:active { transform: scale(.985); }
+  .badge {
+    width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
+    background: linear-gradient(135deg, rgba(34,184,207,.18), rgba(124,92,255,.18)); font-size: 20px;
+  }
+  .dmeta { flex: 1; min-width: 0; }
+  .dmeta strong { display: block; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dmeta span { display: block; font-size: 11.5px; color: #8E89A3; margin-top: 3px; }
+  .go { font-size: 12px; font-weight: 700; color: #fff; background: #22B8CF; border-radius: 999px; padding: 6px 12px; }
+
+  .empty {
+    border: 1px dashed rgba(34,184,207,.35); background: rgba(34,184,207,.05);
+    border-radius: 18px; padding: 26px 18px; text-align: center; color: #6B6780;
+  }
+  .empty .icon { font-size: 26px; margin-bottom: 8px; }
+  .empty p { font-size: 11.5px; margin-top: 6px; line-height: 1.6; color: #8E89A3; }
+
+  .recent { display: flex; align-items: center; gap: 12px; padding: 11px 4px; border-bottom: 1px solid rgba(0,0,0,.05); }
+  .recent:last-child { border-bottom: none; }
+  .recent .fname { flex: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent .fmeta { font-size: 11px; color: #8E89A3; }
+
+  .progress {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: rgba(255,255,255,.96); border-top: 1px solid rgba(0,0,0,.06);
+    padding: 14px 18px calc(var(--pocket-safe-bottom, 0px) + 16px);
+    display: none;
+  }
+  .progress.show { display: block; }
+  .progress .line { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 9px; }
+  .bar { height: 7px; border-radius: 999px; background: rgba(34,184,207,.14); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg,#22B8CF,#7C5CFF); transition: width .2s ease; }
+  .refresh { font-size: 12px; color: #0E7490; background: rgba(34,184,207,.12); border: none; border-radius: 999px; padding: 7px 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>口袋 <em>互传</em></h1>
+    <div class="sub"><span class="dot" id="dot"></span><span id="devName">本机</span> · <span id="addr">正在启动…</span></div>
+  </div>
+  <button class="refresh" id="refresh">刷新</button>
+</header>
+
+<div class="card">
+  <div class="statusRow">
+    <strong>同一 Wi-Fi 下自动发现</strong>
+    <span class="addr" id="portText"></span>
+  </div>
+  <div class="hint">电脑上双击「口袋电脑端」，手机和电脑就会互相出现。点设备即可选文件直传，不限大小、不压缩。</div>
+</div>
+
+<div class="section">附近设备 <span class="count" id="devCount">0</span><span class="hintInline">打开对端口袋后出现</span></div>
+<div id="devices"></div>
+
+<div class="section">最近收到 <span class="count" id="recvCount">0</span><span class="hintInline">完整管理用「口袋文件」</span></div>
+<div class="card" id="recent"></div>
+
+<div class="progress" id="progress">
+  <div class="line"><span id="pName">正在传输…</span><span id="pPercent">0%</span></div>
+  <div class="bar"><i id="pBar"></i></div>
+</div>
+
+<script>
+(function () {
+  var devices = [];
+  var busy = false;
+
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function toast(text) {
+    if (text) pocket.ui.toast(text);
+  }
+
+  function renderStatus(st) {
+    if (!st) return;
+    document.getElementById('dot').className = st.running ? 'dot on' : 'dot';
+    document.getElementById('devName').textContent = st.deviceName || '本机';
+    document.getElementById('addr').textContent = st.running
+      ? (st.ip ? st.ip + ':' + st.port : '端口 ' + st.port)
+      : '服务未启动，重启口袋试试';
+    document.getElementById('portText').textContent = st.running && st.ip ? st.ip + ':' + st.port : '';
+  }
+
+  function renderDevices() {
+    var box = document.getElementById('devices');
+    document.getElementById('devCount').textContent = devices.length;
+    if (!devices.length) {
+      box.innerHTML = '<div class="empty"><div class="icon">⌁</div><strong>还没发现设备</strong>' +
+        '<p>让对端口袋保持打开、连同一个 Wi-Fi；电脑端点桌面「口袋电脑端」</p></div>';
+      return;
+    }
+    box.innerHTML = devices.map(function (d) {
+      var mobile = d.platform === 'android';
+      return '<button class="device" data-id="' + esc(d.id) + '">' +
+        '<div class="badge">' + (mobile ? '📱' : '💻') + '</div>' +
+        '<div class="dmeta"><strong>' + esc(d.name) + '</strong>' +
+        '<span>' + (mobile ? '手机' : '电脑') + ' · ' + esc(d.host) + ':' + d.port + '</span></div>' +
+        '<span class="go">发送</span></button>';
+    }).join('');
+  }
+
+  function renderRecent(files) {
+    var list = (files || []).slice(0, 5);
+    document.getElementById('recvCount').textContent = (files || []).length;
+    var box = document.getElementById('recent');
+    if (!list.length) {
+      box.innerHTML = '<div class="hint" style="margin:0">还没有收到文件。别人选中这台手机发送后，会出现在这里。</div>';
+      return;
+    }
+    box.innerHTML = list.map(function (f) {
+      return '<div class="recent"><div class="fname">' + esc(f.name) + '</div>' +
+        '<div class="fmeta">' + fmtSize(f.size) + ' · ' + esc(f.peer || '') + '</div></div>';
+    }).join('');
+  }
+
+  function fmtSize(bytes) {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function showProgress(name, percent) {
+    var box = document.getElementById('progress');
+    box.classList.add('show');
+    document.getElementById('pName').textContent = name || '正在传输…';
+    document.getElementById('pPercent').textContent = (percent || 0) + '%';
+    document.getElementById('pBar').style.width = (percent || 0) + '%';
+  }
+
+  function hideProgress() {
+    document.getElementById('progress').classList.remove('show');
+  }
+
+  async function refresh() {
+    try {
+      var st = await pocket.transfer.status();
+      renderStatus(st);
+      devices = await pocket.transfer.devices();
+      renderDevices();
+      var files = await pocket.files.list({ direction: 'in' });
+      renderRecent(files);
+    } catch (e) {
+      toast(e.message || '刷新失败');
+    }
+  }
+
+  async function sendTo(deviceId) {
+    if (busy) return;
+    busy = true;
+    showProgress('选择文件…', 0);
+    try {
+      var result = await pocket.transfer.pickAndSend(deviceId);
+      var count = (result && result.sent) ? result.sent.length : 0;
+      toast('已发送 ' + count + ' 个文件');
+    } catch (e) {
+      if (!(e && e.code === 'E_CANCELLED')) toast(e.message || '发送失败');
+    }
+    busy = false;
+    hideProgress();
+    refresh();
+  }
+
+  document.getElementById('devices').addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-id]') : null;
+    if (btn) sendTo(btn.getAttribute('data-id'));
+  });
+  document.getElementById('refresh').addEventListener('click', refresh);
+
+  pocket.on('transfer.progress', function (p) {
+    if (!p) return;
+    showProgress(p.name, p.percent || 0);
+  });
+  pocket.on('transfer.received', function (data) {
+    hideProgress();
+    var name = data && data.file ? data.file.name : '';
+    toast(name ? '收到 ' + name : '收到新文件');
+    refresh();
+  });
+
+  pocket.ui.keepScreenOn(true);
+  refresh();
+  setInterval(refresh, 3000);
+})();
+</script>
+</body>
+</html>

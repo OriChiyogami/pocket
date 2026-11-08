@@ -57,6 +57,7 @@ class AppRunnerActivity : ComponentActivity(), RunnerHost {
 
     private var foregroundStart = 0L
     private var pendingPick: ((List<PickedFile>?) -> Unit)? = null
+    private var pendingPickRef: ((List<PickedRef>?) -> Unit)? = null
     private var sdkCache: String? = null
 
     override val appId: String get() = app.id
@@ -434,7 +435,25 @@ class AppRunnerActivity : ComponentActivity(), RunnerHost {
         }
     }
 
+    override fun pickFiles(accept: String, multiple: Boolean, onResult: (List<PickedRef>?) -> Unit) {
+        pendingPickRef = onResult
+        val mime = if (accept.startsWith(".") || accept.isBlank()) "*/*" else accept
+        runCatching {
+            if (multiple) pickMultiple.launch(arrayOf(mime)) else pickSingle.launch(arrayOf(mime))
+        }.onFailure {
+            pendingPickRef = null
+            onResult(null)
+        }
+    }
+
     private fun handlePicked(uris: List<Uri>) {
+        val refCallback = pendingPickRef
+        if (refCallback != null) {
+            pendingPickRef = null
+            refCallback(if (uris.isEmpty()) null else uris.mapNotNull { readPickedRef(it) })
+            return
+        }
+
         val callback = pendingPick
         pendingPick = null
         if (callback == null) return
@@ -447,6 +466,26 @@ class AppRunnerActivity : ComponentActivity(), RunnerHost {
                 uris.mapNotNull { uri -> readPickedFile(uri) }
             }
             callback(files)
+        }
+    }
+
+    /** 互传用：只拿 Uri 和元数据，发送时再流式读取，避免大文件进内存。 */
+    private fun readPickedRef(uri: Uri): PickedRef? {
+        return try {
+            val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+            var name = "file"
+            var size = -1L
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (cursor.moveToFirst()) {
+                    if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
+                    if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex)
+                }
+            }
+            PickedRef(uri = uri, name = name, mime = mime, size = size)
+        } catch (e: Exception) {
+            null
         }
     }
 

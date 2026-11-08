@@ -8,6 +8,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import io.pocket.host.core.InstalledApp
+import io.pocket.host.core.TransferStore
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -48,6 +49,21 @@ class PocketWebViewClient(
                 ),
                 ByteArrayInputStream(sdkProvider().toByteArray())
             )
+        }
+
+        // 口袋文件：页面可直接 <img>/<video>/fetch 这些地址，读取的是互传目录里的文件
+        if (path.startsWith(FILES_PATH)) {
+            val id = path.removePrefix(FILES_PATH)
+            val entry = TransferStore.get(context, id)
+            val file = TransferStore.fileOf(context, id)
+            if (entry == null || file == null) return emptyResponse(404, "Not Found")
+            val headers = mutableMapOf(
+                "Cache-Control" to "no-store",
+                "Accept-Ranges" to "bytes"
+            )
+            val range = request.requestHeaders["Range"] ?: request.requestHeaders["range"]
+            val mime = entry.mime.ifBlank { mimeOf(entry.name) }
+            return respondFile(file, mime, headers, range)
         }
 
         val relative = when {
@@ -193,6 +209,7 @@ class PocketWebViewClient(
 
     companion object {
         const val SDK_PATH = "/__pocket/sdk.js"
+        const val FILES_PATH = "/__pocket/files/"
 
         fun mimeOf(name: String): String {
             val ext = name.substringAfterLast('.', "").lowercase()

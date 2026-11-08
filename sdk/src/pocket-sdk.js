@@ -36,6 +36,9 @@
     'http.request': 1,
     'ai.chat': 1,
     'image.generate': 1,
+    'transfer.pickAndSend': 1,
+    'transfer.sendStored': 1,
+    'files.export': 1,
     'tts.speak': 1,
     'tts.stop': 1,
     'tts.available': 1
@@ -412,6 +415,50 @@
           outputFormat: opts.format || opts.outputFormat || 'png',
           images: opts.images || opts.refs || []
         }).then(function (r) { return (r && r.images) ? r.images : []; });
+      }
+    },
+
+    /* ---- 口袋文件：互传收发的文件，和系统下载/相册分开 ---- */
+    files: {
+      /** options: { direction: '' | 'in' | 'out' } */
+      list: function (options) {
+        var opts = options || {};
+        return invoke('files.list', { direction: opts.direction || '' }).then(function (r) {
+          return r || [];
+        });
+      },
+      rename: function (id, name) {
+        return invoke('files.rename', { id: String(id), name: String(name == null ? '' : name) });
+      },
+      /** 删除一个或多个文件 */
+      remove: function (ids) {
+        var list = Object.prototype.toString.call(ids) === '[object Array]' ? ids : [ids];
+        return invoke('files.delete', { ids: list });
+      },
+      /** 另存到系统「下载/Pocket」，返回 { ok, path } */
+      save: function (id) {
+        return invoke('files.export', { id: String(id) });
+      },
+      /** 同源预览地址，可直接用于 <img>/<video>/fetch */
+      url: function (id) {
+        return '/__pocket/files/' + encodeURIComponent(String(id));
+      }
+    },
+
+    /* ---- 局域网互传 ---- */
+    transfer: {
+      /** { running, port, ip, deviceId, deviceName, peers } */
+      status: function () { return invoke('transfer.status'); },
+      /** [{ id, name, platform, host, port, lastSeen }] */
+      devices: function () { return invoke('transfer.devices'); },
+      /** 弹原生文件选择器，选完直接流式发送 */
+      pickAndSend: function (deviceId) {
+        return invoke('transfer.pickAndSend', { deviceId: String(deviceId) });
+      },
+      /** 把「口袋文件」里的文件发给设备 */
+      sendStored: function (deviceId, ids) {
+        var list = Object.prototype.toString.call(ids) === '[object Array]' ? ids : [ids];
+        return invoke('transfer.sendStored', { deviceId: String(deviceId), ids: list });
       }
     },
 

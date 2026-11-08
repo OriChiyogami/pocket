@@ -4,16 +4,20 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.media.MediaScannerConnection
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.provider.MediaStore
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.webkit.JavascriptInterface
@@ -26,6 +30,10 @@ import io.pocket.host.core.ImageConfig
 import io.pocket.host.core.InstalledApp
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.core.PocketStorage
+import io.pocket.host.core.TransferClient
+import io.pocket.host.core.TransferEvents
+import io.pocket.host.core.TransferRuntime
+import io.pocket.host.core.TransferStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -49,6 +57,14 @@ class PocketBridge(
     private val main = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
     private val storage = PocketStorage(storageFile)
+
+    private val transferListener: (String, JSONObject) -> Unit = { name, payload ->
+        emitTransferEvent(name, payload)
+    }
+
+    init {
+        TransferEvents.add(transferListener)
+    }
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
@@ -149,6 +165,46 @@ class PocketBridge(
             }
 
             "system.exit" -> { host.closeApp(); null }
+
+            "transfer.status" -> TransferRuntime.statusJson()
+
+            "transfer.devices" -> TransferRuntime.devicesJson()
+
+            "files.list" -> {
+                val direction = params.optString("direction", "")
+                val array = JSONArray()
+                TransferStore.list(hostContext(), direction).forEach { array.put(it.toJson()) }
+                array
+            }
+
+            "files.delete" -> {
+                val ids = mutableListOf<String>()
+                params.optJSONArray("ids")?.let { arr ->
+                    for (i in 0 until arr.length()) {
+                        val value = arr.optString(i)
+                        if (value.isNotBlank()) ids.add(value)
+                    }
+                }
+                val single = params.optString("id")
+                if (single.isNotBlank()) ids.add(single)
+                var deleted = 0
+                ids.forEach { if (TransferStore.delete(hostContext(), it)) deleted++ }
+                JSONObject().put("ok", true).put("deleted", deleted)
+            }
+
+            "files.rename" -> {
+                val fileId = params.requireString("id")
+                val name = params.optString("name")
+                val entry = TransferStore.rename(hostContext(), fileId, name)
+                    ?: throw BridgeException("E_IO", "重命名失败")
+                entry.toJson()
+            }
+
+            "files.url" -> {
+                val fileId = params.requireString("id")
+                "/__pocket/files/" + Uri.encode(fileId)
+            }
+
             else -> throw BridgeException("E_NO_METHOD", "未知方法：$method")
         }
     }
@@ -388,6 +444,94 @@ class PocketBridge(
                     }
                 }
 
+                "transfer.pickAndSend" -> {
+                    val deviceId = params.optString("deviceId")
+                    val peer = TransferRuntime.findPeer(deviceId)
+                    if (peer == null) {
+                        resolve(id, false, null, BridgeException("E_NOT_FOUND", "设备不在线，刷新后再试"))
+                    } else {
+                        host.pickFiles("*/*", true) { refs ->
+                            if (refs == null) {
+                                resolve(id, false, null, BridgeException("E_CANCELLED", "已取消"))
+                            } else {
+                                io.execute {
+                                    runCatching {
+                                        val sources = refs.map { ref ->
+                                            TransferClient.Source(
+                                                name = ref.name,
+                                                mime = ref.mime,
+                                                size = ref.size
+                                            ) {
+                                                runCatching {
+                                                    hostContext().contentResolver
+                                                        .openInputStream(ref.uri)
+                                                }.getOrNull()
+                                            }
+                                        }
+                                        TransferClient.send(
+                                            hostContext(), peer, sources, ::emitTransferProgress
+                                        )
+                                    }.onSuccess { names ->
+                                        resolve(
+                                            id, true,
+                                            JSONObject().put("ok", true).put("sent", JSONArray(names)),
+                                            null
+                                        )
+                                    }.onFailure { e ->
+                                        resolve(id, false, null, BridgeException("E_TRANSFER", e.message ?: "发送失败"))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                "transfer.sendStored" -> {
+                    val deviceId = params.optString("deviceId")
+                    val peer = TransferRuntime.findPeer(deviceId)
+                    val ids = mutableListOf<String>()
+                    params.optJSONArray("ids")?.let { arr ->
+                        for (i in 0 until arr.length()) {
+                            val value = arr.optString(i)
+                            if (value.isNotBlank()) ids.add(value)
+                        }
+                    }
+                    val entries = ids.mapNotNull { TransferStore.get(hostContext(), it) }
+                    when {
+                        peer == null -> resolve(id, false, null, BridgeException("E_NOT_FOUND", "设备不在线"))
+                        entries.isEmpty() -> resolve(id, false, null, BridgeException("E_INVALID_ARG", "没有可发送的文件"))
+                        else -> io.execute {
+                            runCatching {
+                                val sources = entries.map {
+                                    TransferClient.sourceOf(hostContext(), it)
+                                }
+                                TransferClient.send(
+                                    hostContext(), peer, sources, ::emitTransferProgress
+                                )
+                            }.onSuccess { names ->
+                                resolve(
+                                    id, true,
+                                    JSONObject().put("ok", true).put("sent", JSONArray(names)),
+                                    null
+                                )
+                            }.onFailure { e ->
+                                resolve(id, false, null, BridgeException("E_TRANSFER", e.message ?: "发送失败"))
+                            }
+                        }
+                    }
+                }
+
+                "files.export" -> {
+                    val fileId = params.optString("id")
+                    io.execute {
+                        runCatching { exportToDownloads(fileId) }
+                            .onSuccess { resolve(id, true, it, null) }
+                            .onFailure { e ->
+                                resolve(id, false, null, BridgeException("E_IO", e.message ?: "导出失败"))
+                            }
+                    }
+                }
+
                 "tts.speak" -> {
                     val text = params.optString("text")
                     val utteranceId = params.optString("utteranceId").ifEmpty {
@@ -580,12 +724,72 @@ class PocketBridge(
 
     /** 释放 TTS 引擎，避免退出后仍在后台占用语音。 */
     fun release() {
+        TransferEvents.remove(transferListener)
         ttsQueue.clear()
         runCatching { tts?.stop() }
         runCatching { tts?.shutdown() }
         tts = null
         ttsReady = false
         ttsInitDone = false
+    }
+
+    // ---------------------------------------------------------------- 互传
+
+    private fun emitTransferEvent(name: String, payload: JSONObject) {
+        val script = "window.__pocketEvent && window.__pocketEvent(" +
+            "${JSONObject.quote(name)}, ${JSONObject.quote(payload.toString())})"
+        main.post { runCatching { webView.evaluateJavascript(script, null) } }
+    }
+
+    private fun emitTransferProgress(name: String, sent: Long, total: Long) {
+        val percent = if (total > 0) ((sent * 100) / total).toInt() else 0
+        TransferEvents.emit(
+            "transfer.progress",
+            JSONObject()
+                .put("name", name)
+                .put("sent", sent)
+                .put("total", total)
+                .put("percent", percent)
+        )
+    }
+
+    /** 把「口袋文件」里的文件另存到系统下载目录，方便用其它 App 打开。 */
+    private fun exportToDownloads(fileId: String): JSONObject {
+        val context = hostContext()
+        val entry = TransferStore.get(context, fileId)
+            ?: throw IllegalStateException("文件不存在")
+        val source = TransferStore.fileOf(context, fileId)
+            ?: throw IllegalStateException("文件已被删除")
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, entry.name)
+                put(MediaStore.Downloads.MIME_TYPE, entry.mime)
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Pocket")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: throw IllegalStateException("无法创建下载文件")
+            resolver.openOutputStream(uri)?.use { out ->
+                source.inputStream().use { it.copyTo(out) }
+            }
+            values.clear()
+            values.put(MediaStore.Downloads.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return JSONObject().put("ok", true).put("path", "下载/Pocket/" + entry.name)
+        }
+
+        @Suppress("DEPRECATION")
+        val dir = File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+            "Pocket"
+        )
+        dir.mkdirs()
+        val target = File(dir, TransferStore.uniqueName(dir, entry.name))
+        source.copyTo(target, overwrite = false)
+        MediaScannerConnection.scanFile(context, arrayOf(target.absolutePath), null, null)
+        return JSONObject().put("ok", true).put("path", target.absolutePath)
     }
 
     private fun ensureTts(): TextToSpeech {

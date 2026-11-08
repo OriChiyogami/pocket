@@ -1,5 +1,6 @@
 package io.pocket.host.runner
 
+import android.net.Uri
 import org.json.JSONObject
 
 sealed class DialogRequest {
@@ -42,6 +43,14 @@ data class PickedFile(
     val dataUrl: String
 )
 
+/** 只带 Uri 的选择结果：用于互传这种要直接流式发送、不该把文件读进内存的场景。 */
+data class PickedRef(
+    val uri: Uri,
+    val name: String,
+    val mime: String,
+    val size: Long
+)
+
 data class SafeArea(
     val top: Int = 0,
     val bottom: Int = 0,
@@ -60,6 +69,7 @@ interface RunnerHost {
     fun showToast(text: String)
     fun showDialog(request: DialogRequest, onResult: (Any?) -> Unit)
     fun pickFile(accept: String, multiple: Boolean, onResult: (List<PickedFile>?) -> Unit)
+    fun pickFiles(accept: String, multiple: Boolean, onResult: (List<PickedRef>?) -> Unit)
     fun requestNotificationPermission(onResult: (Boolean) -> Unit)
     fun applyStatusBar(style: String, color: String?)
     fun applyFullscreen(enabled: Boolean)

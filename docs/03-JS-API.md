@@ -400,7 +400,78 @@ if (!st.available) { /* 引导用户去 设置 → 生图模型 */ }
 
 ---
 
-## 10. 事件
+## 10. 文件与互传
+
+「互传」和「口袋文件」两个内置应用就是用下面这组接口实现的。文件存在应用私有的
+`files/transfer/`，与系统相册/下载、各个应用的 `www` 完全分开。
+
+### `pocket.transfer.status(): Promise<TransferStatus>`
+
+```js
+const st = await pocket.transfer.status();
+// { running, port, ip, deviceId, deviceName, peers }
+```
+
+### `pocket.transfer.devices(): Promise<Peer[]>`
+
+```js
+const devices = await pocket.transfer.devices();
+// [{ id, name, platform: 'android'|'windows', host, port, lastSeen }]
+```
+
+同一 Wi-Fi 下，对端口袋打开后 5 秒内会自动出现；过期设备（25 秒无广播）自动消失。
+
+### `pocket.transfer.pickAndSend(deviceId): Promise<{ ok, sent: string[] }>`
+
+弹出原生文件选择器（可多选），选完直接流式发送，不经过 base64、不限文件大小。
+发送过程中会收到 `transfer.progress` 事件。
+
+```js
+const devices = await pocket.transfer.devices();
+if (devices.length) {
+  const r = await pocket.transfer.pickAndSend(devices[0].id);
+  console.log('已发送', r.sent);
+}
+```
+
+### `pocket.transfer.sendStored(deviceId, ids): Promise<{ ok, sent: string[] }>`
+
+把「口袋文件」里已有的文件转发给另一台设备（手机或电脑）。
+
+### 传输事件
+
+```js
+pocket.on('transfer.progress', (p) => {
+  // { name, sent, total, percent }
+});
+pocket.on('transfer.received', (data) => {
+  // { file: { id, name, size, mime, direction, peer, time } }
+});
+```
+
+### `pocket.files.list(options?): Promise<TransferFile[]>`
+
+```js
+const files = await pocket.files.list({ direction: 'in' }); // '' | 'in' | 'out'
+// [{ id, name, size, mime, direction, peer, time }]
+```
+
+### `pocket.files.rename(id, name)` · `pocket.files.remove(ids)`
+
+`ids` 可以是单个 id 或数组。
+
+### `pocket.files.save(id): Promise<{ ok, path }>`
+
+另存到系统「下载/Pocket」，方便用其它 App 打开。
+
+### `pocket.files.url(id): string`
+
+返回同源预览地址 `/__pocket/files/<id>`，可直接用于 `<img>`、`<video>`、`<audio>` 或 `fetch`。
+该地址由宿主从 `files/transfer` 里流式返回，支持 Range，不经过网络。
+
+---
+
+## 11. 事件
 
 ```js
 pocket.on('back', () => {
@@ -423,7 +494,7 @@ pocket.on('back', () => {
 
 ---
 
-## 11. 错误码
+## 12. 错误码
 
 | code | 含义 |
 |---|---|
@@ -436,11 +507,14 @@ pocket.on('back', () => {
 | `E_CANCELLED` | 用户取消（`file.pick` 会转成 `null`，不会抛） |
 | `E_AI` | AI 对话失败（接口状态码 / 额度 / 模型名） |
 | `E_IMAGE` | 生图失败（接口状态码 / 额度 / 模型名） |
+| `E_TRANSFER` | 互传失败（对端离线、网络中断、对方拒绝） |
+| `E_NOT_FOUND` | 设备不在线或文件不存在 |
+| `E_IO` | 本地文件读写失败（导出、重命名等） |
 | `E_NO_BRIDGE` | 页面不在口袋容器内（例如用浏览器直接打开） |
 | `E_INTERNAL` | 宿主内部异常 |
 
 ---
 
-## 12. 类型声明
+## 13. 类型声明
 
 完整 TypeScript 声明见 `sdk/types/pocket.d.ts`。

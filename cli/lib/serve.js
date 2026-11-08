@@ -217,6 +217,69 @@ function escapeHtml(text) {
     .replace(/'/g, '&#39;');
 }
 
+function sanitizeName(raw) {
+  const base = String(raw || 'file').split(/[\\/]/).pop().trim();
+  const cleaned = base.replace(/[\\/:*?"<>|]/g, '_').replace(/[\u0000-\u001F]/g, '');
+  const text = cleaned.replace(/^[. ]+|[. ]+$/g, '') || 'file';
+  if (text.length <= 120) return text;
+  const dot = text.lastIndexOf('.');
+  return dot > 0 ? text.slice(0, dot).slice(0, 108) + text.slice(dot) : text.slice(0, 120);
+}
+
+function transferFileName(dir, raw) {
+  const safe = sanitizeName(raw);
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const stamp = '' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) +
+    pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+  let name = stamp + '-' + safe;
+  let i = 1;
+  while (fs.existsSync(path.join(dir, name))) {
+    name = stamp + '-' + i + '-' + safe;
+    i += 1;
+  }
+  return name;
+}
+
+function mimeOfName(name) {
+  const ext = String(name || '').split('.').pop().toLowerCase();
+  const map = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+    bmp: 'image/bmp', svg: 'image/svg+xml',
+    mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime',
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', ogg: 'audio/ogg', flac: 'audio/flac',
+    pdf: 'application/pdf', txt: 'text/plain; charset=utf-8', md: 'text/plain; charset=utf-8',
+    json: 'application/json; charset=utf-8', zip: 'application/zip', rar: 'application/vnd.rar',
+    '7z': 'application/x-7z-compressed', apk: 'application/vnd.android.package-archive',
+    html: 'text/html; charset=utf-8', css: 'text/css; charset=utf-8', js: 'application/javascript; charset=utf-8'
+  };
+  return map[ext] || 'application/octet-stream';
+}
+
+function scanTransferFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    let stat;
+    try { stat = fs.statSync(full); } catch (e) { continue; }
+    if (!stat.isFile()) continue;
+    out.push({ id: name, name, size: stat.size, mtime: stat.mtimeMs, mime: mimeOfName(name) });
+  }
+  return out.sort((a, b) => b.mtime - a.mtime);
+}
+
+function readDeviceId(libraryDir) {
+  const file = path.join(libraryDir, '.pocket-device.json');
+  try {
+    const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+    if (json && json.id) return json.id;
+  } catch (e) {}
+  const id = 'pc' + crypto.randomBytes(6).toString('hex');
+  try { fs.writeFileSync(file, JSON.stringify({ id }, null, 2)); } catch (e) {}
+  return id;
+}
+
 function renderPage(options) {
   const { name, port, addresses, apps, host } = options;
   const library = options.library || [];
@@ -341,6 +404,9 @@ function renderPage(options) {
   .drop input { display: none; }
   .uploadStatus { margin-top: 12px; font-size: 12.5px; color: #5B43C9; min-height: 18px; }
   @media (prefers-color-scheme: dark) { .uploadStatus { color: #B7A6FF; } }
+  .deviceCard.hover { border-color: #7C5CFF; background: rgba(124,92,255,.1); }
+  .xfStatus { margin-top: 12px; font-size: 12.5px; color: #5B43C9; min-height: 18px; }
+  @media (prefers-color-scheme: dark) { .xfStatus { color: #B7A6FF; } }
 
   .sectionTitle { margin: 32px 0 14px; display: flex; align-items: center; gap: 10px; }
   .sectionTitle h2 { font-size: 20px; font-weight: 700; }
@@ -450,6 +516,23 @@ function renderPage(options) {
   <p class="libTip">原来直接双击打开这个文件时，数据存在那个页面的浏览器存储里；换到这里打开后点一次「迁数据」，在旧页面按 F12 → 控制台运行 <code>copy(JSON.stringify(localStorage))</code>，把结果粘进来即可。</p>
 
   <div class="grid" id="libGrid">${libraryCards}</div>
+
+  <div class="sectionTitle">
+    <h2>局域网互传</h2>
+    <span class="count" id="devCount">0</span>
+    <span class="hint">手机打开口袋就会自动出现；点「发送文件」或把文件拖到设备卡片上</span>
+  </div>
+
+  <div class="grid" id="devGrid"></div>
+  <div class="xfStatus" id="xfStatus"></div>
+
+  <div class="sectionTitle">
+    <h2>互传收到的文件</h2>
+    <span class="count" id="xfCount">0</span>
+    <span class="hint">手机发给电脑的文件，单独存在 library/transfer，与收藏分开</span>
+  </div>
+
+  <div class="grid" id="xfGrid"></div>
 
   <footer>口袋 Pocket · 电脑端服务 · 端口 ${port} · 目录 ${escapeHtml(options.dir)}</footer>
 </div>
@@ -619,6 +702,191 @@ function renderPage(options) {
     });
   }
 
+  // ------------------------------------------------ 局域网互传
+  var PC_NAME = ${JSON.stringify(name)};
+  var devGrid = document.getElementById('devGrid');
+  var devCount = document.getElementById('devCount');
+  var xfGrid = document.getElementById('xfGrid');
+  var xfCount = document.getElementById('xfCount');
+  var xfStatus = document.getElementById('xfStatus');
+  var devices = [];
+  var sending = false;
+
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function setXf(text) { if (xfStatus) xfStatus.textContent = text || ''; }
+
+  function sizeText(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1048576).toFixed(1) + ' MB';
+  }
+
+  function renderDevices() {
+    devCount.textContent = devices.length;
+    if (!devices.length) {
+      devGrid.innerHTML = '<div class="empty"><div class="emptyIcon">⌁</div>' +
+        '<h3>暂时没发现设备</h3><p>让手机打开口袋、连同一个 Wi-Fi，几秒后会出现在这里</p></div>';
+      return;
+    }
+    devGrid.innerHTML = devices.map(function (d) {
+      return '<div class="card deviceCard" data-device="' + esc(d.id) + '">' +
+        '<div class="icon" style="--accent:#7C5CFF"><span>' + (d.platform === 'android' ? 'A' : 'PC') + '</span></div>' +
+        '<div class="meta"><div class="row1"><h3>' + esc(d.name) + '</h3>' +
+        '<span class="ver">' + esc(d.host) + '</span></div>' +
+        '<div class="sub">' + (d.platform === 'android' ? '手机' : '电脑') + ' · ' + esc(d.host) + ':' + d.port + '</div></div>' +
+        '<div class="ops"><button class="mini text" data-send>发送文件</button></div></div>';
+    }).join('');
+  }
+
+  function refreshDevices() {
+    if (sending) return;
+    fetch('/api/transfer/devices').then(function (r) { return r.json(); }).then(function (j) {
+      devices = j.devices || [];
+      renderDevices();
+    }).catch(function () {});
+  }
+
+  function refreshFiles() {
+    fetch('/api/transfer/files').then(function (r) { return r.json(); }).then(function (j) {
+      var files = j.files || [];
+      xfCount.textContent = files.length;
+      if (!files.length) {
+        xfGrid.innerHTML = '<div class="empty"><div class="emptyIcon">↓</div>' +
+          '<h3>还没有收到文件</h3><p>在手机「互传」里选这台电脑发送，文件会单独收在这里</p></div>';
+        return;
+      }
+      xfGrid.innerHTML = files.map(function (f) {
+        return '<div class="card">' +
+          '<div class="icon lib" style="--accent:#22B8CF"><span>F</span></div>' +
+          '<div class="meta"><div class="row1"><h3>' + esc(f.name) + '</h3></div>' +
+          '<div class="sub">' + sizeText(f.size) + ' · ' + new Date(f.mtime).toLocaleString('zh-CN') + '</div></div>' +
+          '<div class="ops"><a class="mini text" href="/api/transfer/file/' + encodeURIComponent(f.id) + '" download>下载</a>' +
+          '<button class="mini danger" data-xf-rm="' + esc(f.id) + '">✕</button></div></div>';
+      }).join('');
+    }).catch(function () {});
+  }
+
+  function putFile(url, file, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = function () {
+        if (xhr.status >= 200 && xhr.status < 300) resolve();
+        else reject(new Error('HTTP ' + xhr.status));
+      };
+      xhr.onerror = function () { reject(new Error('网络错误')); };
+      xhr.send(file);
+    });
+  }
+
+  function sendFiles(device, files) {
+    if (!files || !files.length || sending) return;
+    sending = true;
+    var base = 'http://' + device.host + ':' + device.port;
+    setXf('正在向「' + device.name + '」申请传输…');
+
+    var offerBody = {
+      from: { id: 'pc', name: PC_NAME, platform: 'windows' },
+      files: Array.prototype.map.call(files, function (f) {
+        return { name: f.name, size: f.size, mime: f.type || 'application/octet-stream' };
+      })
+    };
+
+    fetch(base + '/api/transfer/offer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(offerBody)
+    }).then(function (r) { return r.json(); }).then(function (offer) {
+      if (!offer || !offer.token) throw new Error((offer && offer.error) || '对方拒绝接收');
+      var chain = Promise.resolve();
+      Array.prototype.forEach.call(files, function (file, i) {
+        chain = chain.then(function () {
+          setXf('正在发送 ' + (i + 1) + '/' + files.length + '：' + file.name);
+          return putFile(base + '/api/transfer/upload/' + offer.token + '/' + i, file, function (p) {
+            setXf('正在发送 ' + (i + 1) + '/' + files.length + '：' + file.name + ' ' + Math.round(p * 100) + '%');
+          });
+        });
+      });
+      return chain;
+    }).then(function () {
+      sending = false;
+      setXf('发送完成，共 ' + files.length + ' 个文件');
+      refreshDevices();
+    }).catch(function (err) {
+      sending = false;
+      setXf('发送失败：' + ((err && err.message) || err));
+    });
+  }
+
+  function deviceOf(card) {
+    if (!card) return null;
+    var id = card.getAttribute('data-device');
+    for (var i = 0; i < devices.length; i++) {
+      if (devices[i].id === id) return devices[i];
+    }
+    return null;
+  }
+
+  devGrid.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-send]') : null;
+    if (!btn) return;
+    var device = deviceOf(btn.closest('[data-device]'));
+    if (!device) return;
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.onchange = function () { sendFiles(device, input.files); };
+    input.click();
+  });
+
+  devGrid.addEventListener('dragover', function (e) {
+    var card = e.target.closest ? e.target.closest('[data-device]') : null;
+    if (!card) return;
+    e.preventDefault();
+    card.classList.add('hover');
+  });
+
+  devGrid.addEventListener('dragleave', function (e) {
+    var card = e.target.closest ? e.target.closest('[data-device]') : null;
+    if (card) card.classList.remove('hover');
+  });
+
+  devGrid.addEventListener('drop', function (e) {
+    var card = e.target.closest ? e.target.closest('[data-device]') : null;
+    if (!card) return;
+    e.preventDefault();
+    card.classList.remove('hover');
+    var device = deviceOf(card);
+    if (device) sendFiles(device, e.dataTransfer.files);
+  });
+
+  xfGrid.addEventListener('click', function (e) {
+    var btn = e.target.closest ? e.target.closest('[data-xf-rm]') : null;
+    if (!btn) return;
+    if (!confirm('删除这个文件？')) return;
+    fetch('/api/transfer/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: btn.getAttribute('data-xf-rm') })
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.ok) refreshFiles(); else alert(j.error || '删除失败');
+    });
+  });
+
+  refreshDevices();
+  refreshFiles();
+  setInterval(refreshDevices, 2500);
+  setInterval(refreshFiles, 8000);
+
   var shutdown = document.getElementById('shutdown');
   shutdown.addEventListener('click', function () {
     if (!confirm('关闭电脑端服务？\\n关闭后手机暂时无法从这台电脑导入，重新双击桌面快捷方式即可再启动。')) return;
@@ -654,6 +922,27 @@ function startServer(options) {
   fs.mkdirSync(dir, { recursive: true });
   fs.mkdirSync(libraryDir, { recursive: true });
 
+  // 互传：收到的文件单独放 library/transfer；设备表来自 UDP 广播
+  const transferDir = path.join(libraryDir, 'transfer');
+  fs.mkdirSync(transferDir, { recursive: true });
+  const deviceId = readDeviceId(libraryDir);
+  const devices = new Map();
+  const transferPending = new Map();
+  let announceTimer = null;
+  const discoverPort = port + DISCOVER_PORT_OFFSET;
+
+  function sendJson(res, code, obj) {
+    res.writeHead(code, {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Range',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Range'
+    });
+    res.end(JSON.stringify(obj));
+  }
+
   let stopping = false;
   let udp = null;
 
@@ -668,6 +957,9 @@ function startServer(options) {
   function stopService() {
     if (stopping) return;
     stopping = true;
+    try {
+      if (announceTimer) clearInterval(announceTimer);
+    } catch (e) {}
     try {
       if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
     } catch (e) {}
@@ -712,6 +1004,175 @@ function startServer(options) {
       if (pathname === '/api/library') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify({ ok: true, library: scanHtmlLibrary(libraryDir) }));
+        return;
+      }
+
+      // ---------------------------------------------------------- 局域网互传
+      if (req.method === 'OPTIONS' && pathname.startsWith('/api/transfer')) {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Range',
+          'Access-Control-Expose-Headers': 'Content-Length, Content-Range'
+        });
+        res.end();
+        return;
+      }
+
+      if (pathname === '/api/transfer/info') {
+        sendJson(res, 200, {
+          ok: true,
+          id: deviceId,
+          name,
+          platform: 'windows',
+          port,
+          transferPort: port,
+          version: 1
+        });
+        return;
+      }
+
+      if (pathname === '/api/transfer/devices' && req.method === 'GET') {
+        const now = Date.now();
+        const list = [];
+        for (const [key, device] of devices) {
+          if (now - device.lastSeen > 25000) {
+            devices.delete(key);
+            continue;
+          }
+          list.push(device);
+        }
+        sendJson(res, 200, { ok: true, devices: list });
+        return;
+      }
+
+      if (pathname === '/api/transfer/offer' && req.method === 'POST') {
+        const raw = (await readBody(req, 1024 * 1024)).toString('utf8') || '{}';
+        let payload = {};
+        try { payload = JSON.parse(raw); } catch (e) { payload = {}; }
+        const files = Array.isArray(payload.files)
+          ? payload.files.map((f) => ({
+              name: sanitizeName(f && f.name),
+              size: Number(f && f.size) || 0,
+              mime: String((f && f.mime) || 'application/octet-stream')
+            }))
+          : [];
+        if (!files.length) {
+          sendJson(res, 400, { error: 'files 不能为空' });
+          return;
+        }
+        const now = Date.now();
+        for (const [key, offer] of transferPending) {
+          if (now - offer.createdAt > 10 * 60 * 1000) transferPending.delete(key);
+        }
+        const token = crypto.randomBytes(8).toString('hex');
+        transferPending.set(token, {
+          files,
+          fromName: (payload.from && payload.from.name) || '未知设备',
+          createdAt: now,
+          done: new Set()
+        });
+        sendJson(res, 200, { ok: true, accepted: true, token });
+        return;
+      }
+
+      if (pathname.startsWith('/api/transfer/upload/') &&
+          (req.method === 'PUT' || req.method === 'POST')) {
+        const bits = pathname.slice('/api/transfer/upload/'.length).split('/');
+        const token = bits[0];
+        const index = Number(bits[1]);
+        const offer = transferPending.get(token);
+        if (!offer) {
+          sendJson(res, 404, { error: '传输已过期，请重发' });
+          return;
+        }
+        if (!Number.isInteger(index) || index < 0 || index >= offer.files.length) {
+          sendJson(res, 400, { error: '文件序号不对' });
+          return;
+        }
+        const info = offer.files[index];
+        const name = transferFileName(transferDir, info.name);
+        const target = path.join(transferDir, name);
+        const out = fs.createWriteStream(target);
+        let bytes = 0;
+        let replied = false;
+        const fail = (code, message) => {
+          if (replied) return;
+          replied = true;
+          sendJson(res, code, { error: message });
+        };
+        req.on('data', (chunk) => { bytes += chunk.length; });
+        req.on('aborted', () => {
+          try { out.destroy(); } catch (e) {}
+          try { fs.unlinkSync(target); } catch (e) {}
+        });
+        req.pipe(out);
+        out.on('error', (err) => fail(500, err.message || '写入失败'));
+        out.on('finish', () => {
+          if (replied) return;
+          if (!bytes) {
+            try { fs.unlinkSync(target); } catch (e) {}
+            fail(400, '空文件');
+            return;
+          }
+          replied = true;
+          offer.done.add(index);
+          if (offer.done.size >= offer.files.length) transferPending.delete(token);
+          sendJson(res, 200, {
+            ok: true,
+            file: { id: name, name, size: bytes, mime: info.mime, time: Date.now() }
+          });
+        });
+        return;
+      }
+
+      if (pathname === '/api/transfer/files' && req.method === 'GET') {
+        sendJson(res, 200, { ok: true, files: scanTransferFiles(transferDir) });
+        return;
+      }
+
+      if (pathname.startsWith('/api/transfer/file/') && req.method === 'GET') {
+        const name = path.basename(pathname.slice('/api/transfer/file/'.length));
+        const full = path.join(transferDir, name);
+        if (!name || !fs.existsSync(full)) {
+          sendJson(res, 404, { error: '文件不存在' });
+          return;
+        }
+        const stat = fs.statSync(full);
+        res.writeHead(200, {
+          'Content-Type': mimeOfName(name),
+          'Content-Length': stat.size,
+          'Content-Disposition': 'inline; filename="' + encodeURIComponent(name) + '"',
+          'Cache-Control': 'no-store'
+        });
+        fs.createReadStream(full).pipe(res);
+        return;
+      }
+
+      if (pathname.startsWith('/api/transfer/file/') && req.method === 'DELETE') {
+        const name = path.basename(pathname.slice('/api/transfer/file/'.length));
+        const full = path.join(transferDir, name);
+        if (!name || !fs.existsSync(full)) {
+          sendJson(res, 404, { error: '文件不存在' });
+          return;
+        }
+        fs.unlinkSync(full);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (pathname === '/api/transfer/delete' && req.method === 'POST') {
+        const raw = (await readBody(req, 1024 * 1024)).toString('utf8') || '{}';
+        let payload = {};
+        try { payload = JSON.parse(raw); } catch (e) { payload = {}; }
+        const name = path.basename(String(payload.id || ''));
+        const full = path.join(transferDir, name);
+        if (!name || !fs.existsSync(full)) {
+          sendJson(res, 404, { error: '文件不存在' });
+          return;
+        }
+        fs.unlinkSync(full);
+        sendJson(res, 200, { ok: true });
         return;
       }
 
@@ -973,13 +1434,34 @@ function startServer(options) {
     if (text.startsWith('POCKET_DISCOVER')) {
       const payload = Buffer.from(JSON.stringify({
         service: 'pocket',
+        id: deviceId,
         name,
+        platform: 'windows',
         port,
+        transferPort: port,
         host: bestAddressFor(rinfo.address),
         version: 1
       }), 'utf8');
       udp.send(payload, rinfo.port, rinfo.address);
+      return;
     }
+    if (!text.startsWith('{')) return;
+    try {
+      const json = JSON.parse(text);
+      if (!json || json.service !== 'pocket') return;
+      if (json.id && json.id === deviceId) return;
+      const transferPort = Number(json.transferPort || json.port || 0);
+      if (!transferPort) return;
+      const key = json.id || (rinfo.address + ':' + transferPort);
+      devices.set(key, {
+        id: key,
+        name: json.name || '未命名设备',
+        platform: json.platform || 'unknown',
+        host: rinfo.address,
+        port: transferPort,
+        lastSeen: Date.now()
+      });
+    } catch (e) {}
   });
 
   process.on('SIGINT', stopService);
@@ -997,8 +1479,25 @@ function startServer(options) {
         }, null, 2));
       } catch (e) {}
       udp.on('error', () => {});
-      udp.bind(port + DISCOVER_PORT_OFFSET, '0.0.0.0', () => {
+      udp.bind(discoverPort, '0.0.0.0', () => {
         try { udp.setBroadcast(true); } catch (e) {}
+        const announce = () => {
+          if (!udp || stopping) return;
+          const payload = Buffer.from(JSON.stringify({
+            service: 'pocket',
+            id: deviceId,
+            name,
+            platform: 'windows',
+            port,
+            transferPort: port,
+            version: 1
+          }), 'utf8');
+          try {
+            udp.send(payload, discoverPort, '255.255.255.255');
+          } catch (e) {}
+        };
+        announceTimer = setInterval(announce, 5000);
+        setTimeout(announce, 300);
         resolve({ server, udp, address: addresses, port, dir });
       });
     });

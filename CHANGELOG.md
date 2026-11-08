@@ -1,5 +1,18 @@
 # 更新日志
 
+## 1.3.0
+- **局域网高速互传**：同一 Wi-Fi 下手机 ↔ 电脑自动发现，直接传任意文件，不走 QQ/微信/网盘
+  - 手机端自带 HTTP 服务（默认 8572）+ UDP 8571 发现，电脑端（8570）同步支持
+  - 支持大文件流式收发（`Content-Length` / `chunked`），带进度、中文文件名、断点 Range 下载
+  - 双向可发：电脑管理页拖文件到设备卡片；手机「互传」里点设备选文件
+- **口袋文件**：互传收发的文件单独存 `files/transfer`（收件/发件按日期分目录，带索引），
+  与系统相册/下载、应用 `www` 完全隔离；支持预览、搜索、重命名、删除、另存到「下载/Pocket」
+- **互传**：设备列表、一键发送、最近收到；传输进度通过事件实时显示
+- **JS SDK**：新增 `pocket.transfer.*`（status/devices/pickAndSend/sendStored）与
+  `pocket.files.*`（list/rename/remove/save/url），文件预览走 `/__pocket/files/<id>`
+- 内置应用新增两个（老用户升级后自动补装）：`com.pocket.transfer`、`com.pocket.files`
+- 电脑端管理页新增「局域网互传」与「互传收到的文件」两块，文件存 `library/transfer`
+
 ## 1.2.8
 - 手机端新增「画图」：首页右上角「画」→ 输入提示词直接生图
 - 支持参考图（最多 4 张）：有参考图时走 `POST {BaseURL}/images/edits`（multipart），无参考图走 `/images/generations`
