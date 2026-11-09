@@ -1,0 +1,15 @@
+{
+  "name": "pocket-desktop",
+  "version": "1.3.2",
+  "private": true,
+  "description": "口袋电脑端：玻璃拟态悬浮窗 + 局域网互传 + 剪贴板同步",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-packager . Pocket --platform=win32 --arch=x64 --out=../dist/desktop --overwrite --icon=assets/pocket.ico"
+  },
+  "devDependencies": {
+    "@electron/packager": "^18.3.6",
+    "electron": "^45.2.3"
+  }
+}

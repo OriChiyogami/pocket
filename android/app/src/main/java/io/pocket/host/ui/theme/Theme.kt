@@ -1,47 +1,43 @@
 package io.pocket.host.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material3.Typography
 import androidx.compose.ui.unit.sp
 
-val PocketPurple = Color(0xFF7C5CFF)
-val PocketPink = Color(0xFFFF6B9D)
-val PocketMint = Color(0xFF2ED573)
+/**
+ * 手机端黑 / 白 / 灰极简配色（参考卡片式 App 设计）。
+ * 变量名保留是为了不改动已有页面。
+ */
+val PocketPurple = Color(0xFF141414)
+val PocketPink = Color(0xFF6B6B6B)
+val PocketMint = Color(0xFF141414)
 
-private val LightScheme = lightColorScheme(
-    primary = PocketPurple,
-    onPrimary = Color.White,
-    secondary = PocketPink,
-    background = Color(0xFFF7F6FA),
-    onBackground = Color(0xFF14121C),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF14121C),
-    surfaceVariant = Color(0xFFEDEAF5),
-    onSurfaceVariant = Color(0xFF6B6780),
-    outline = Color(0xFFDDD8EA),
-    error = Color(0xFFE5484D)
-)
+val PocketDeep = Color(0xFFF3F5F8)
+val PocketSurface = Color(0xFFFFFFFF)
+val PocketSurfaceHigh = Color(0xFFEFEFEC)
+val PocketStroke = Color(0xFFE7EAF0)
+val PocketText = Color(0xFF141414)
+val PocketSub = Color(0xFF69707F)
 
-private val DarkScheme = darkColorScheme(
-    primary = Color(0xFF9A82FF),
+private val MonoScheme = lightColorScheme(
+    primary = Color(0xFF141414),
     onPrimary = Color.White,
-    secondary = PocketPink,
-    background = Color(0xFF0C0B10),
-    onBackground = Color(0xFFF2F0F7),
-    surface = Color(0xFF17151F),
-    onSurface = Color(0xFFF2F0F7),
-    surfaceVariant = Color(0xFF252232),
-    onSurfaceVariant = Color(0xFF9C97B0),
-    outline = Color(0xFF322E42),
-    error = Color(0xFFFF6B6B)
+    secondary = Color(0xFF6B6B6B),
+    onSecondary = Color.White,
+    background = PocketDeep,
+    onBackground = PocketText,
+    surface = PocketSurface,
+    onSurface = PocketText,
+    surfaceVariant = PocketSurfaceHigh,
+    onSurfaceVariant = PocketSub,
+    outline = PocketStroke,
+    error = Color(0xFFD93025)
 )
 
 private val PocketTypography = Typography(
@@ -49,13 +45,13 @@ private val PocketTypography = Typography(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.ExtraBold,
         fontSize = 30.sp,
-        letterSpacing = (-0.5).sp
+        letterSpacing = (-0.8).sp
     ),
     headlineMedium = TextStyle(
         fontFamily = FontFamily.Default,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
-        letterSpacing = (-0.3).sp
+        letterSpacing = (-0.4).sp
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.Default,
@@ -77,11 +73,11 @@ private val PocketTypography = Typography(
 
 @Composable
 fun PocketTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = if (darkTheme) DarkScheme else LightScheme,
+        colorScheme = MonoScheme,
         typography = PocketTypography,
         content = content
     )
@@ -90,5 +86,5 @@ fun PocketTheme(
 fun parseAccent(hex: String): Color = try {
     Color(android.graphics.Color.parseColor(hex))
 } catch (e: Exception) {
-    PocketPurple
+    Color(0xFF141414)
 }

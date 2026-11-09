@@ -1,0 +1,16 @@
+{
+  "schema": "pocket.app/1",
+  "id": "com.pocket.clipboard",
+  "name": "剪贴板",
+  "version": "1.3.0",
+  "entry": "index.html",
+  "description": "手机与电脑双向共享的多轮剪贴板历史，支持后台实时监听",
+  "accent": "#141414",
+  "display": {
+    "orientation": "auto",
+    "statusBar": "light",
+    "fullscreen": false,
+    "background": "#FFF5F5F2"
+  },
+  "permissions": ["clipboard", "haptic"]
+}

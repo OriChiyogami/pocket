@@ -29,6 +29,8 @@
     'ui.actionSheet': 1,
     'clipboard.read': 1,
     'clipboard.write': 1,
+    'clipboard.copy': 1,
+    'clipboard.sync': 1,
     'file.pick': 1,
     'share.text': 1,
     'notify.show': 1,
@@ -467,7 +469,35 @@
       read: function () { return invoke('clipboard.read'); },
       write: function (text) {
         return invoke('clipboard.write', { text: String(text == null ? '' : text) });
-      }
+      },
+      /** 手机端保存的多轮剪贴板历史（与电脑同步后的并集） */
+      history: function () {
+        return invoke('clipboard.history').then(function (list) { return list || []; });
+      },
+      add: function (text, source) {
+        return invoke('clipboard.add', {
+          text: String(text == null ? '' : text),
+          source: source || 'phone'
+        });
+      },
+      remove: function (id) {
+        return invoke('clipboard.remove', { id: String(id) });
+      },
+      clear: function () { return invoke('clipboard.clear'); },
+      /** 把历史里的一条写进系统剪贴板 */
+      copy: function (id) {
+        return invoke('clipboard.copy', { id: String(id) });
+      },
+      /** 从电脑端拉取历史并合并，返回 { added, total, peer } */
+      sync: function () { return invoke('clipboard.sync'); },
+      /** 实时剪贴板状态：{ enabled, accessibility, connected } */
+      realtime: function () { return invoke('clipboard.realtime'); },
+      /** 开关实时监听；开启时如果没授权无障碍，会跳到系统设置 */
+      setRealtime: function (enabled) {
+        return invoke('clipboard.setRealtime', { enabled: !!enabled });
+      },
+      /** 打开系统的无障碍服务设置页 */
+      openRealtimeSettings: function () { return invoke('clipboard.openSettings'); }
     },
 
     /* ---- 分享 ---- */

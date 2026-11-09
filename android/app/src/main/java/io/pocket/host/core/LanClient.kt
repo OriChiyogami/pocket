@@ -94,7 +94,7 @@ object LanClient {
                     name = o.optString("name", "未命名"),
                     version = o.optString("version", "1.0.0"),
                     description = o.optString("description"),
-                    accent = o.optString("accent", "#7C5CFF"),
+                    accent = o.optString("accent", "#2F8BFF"),
                     size = o.optLong("size", 0L),
                     file = o.optString("file"),
                     hasIcon = o.optBoolean("hasIcon", false)

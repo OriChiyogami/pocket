@@ -48,7 +48,7 @@ fun AppDetailSheet(
     onDelete: () -> Unit
 ) {
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val accent = parseAccent(app.accent)
+    val accent = Color(0xFF141414)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

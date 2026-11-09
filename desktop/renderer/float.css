@@ -1,0 +1,389 @@
+:root {
+  --text: #eaf6ff;
+  --sub: #8fb6d6;
+  --dim: #5f809b;
+  --cyan: #6fd6ff;
+  --blue: #2f8bff;
+  --stroke: rgba(151, 210, 255, .14);
+  --ease: cubic-bezier(.22, 1, .36, 1);
+  --spring: cubic-bezier(.34, 1.46, .64, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { width: 100%; height: 100%; overflow: hidden; background: #06182c; }
+
+body {
+  font-family: "Microsoft YaHei UI", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+button, input { font: inherit; color: inherit; }
+button { border: none; background: none; cursor: pointer; }
+svg.ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(111, 214, 255, .18); border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.fw {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0;
+  background:
+    radial-gradient(80% 50% at 8% 0%, rgba(47, 139, 255, .28), transparent 62%),
+    radial-gradient(60% 40% at 100% 100%, rgba(111, 214, 255, .14), transparent 62%),
+    linear-gradient(158deg, #081f39, #06182c 60%, #04101f);
+}
+.fw::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  border: 1px solid rgba(178, 224, 255, .16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  pointer-events: none;
+  z-index: 40;
+}
+
+.fwOrb {
+  position: absolute;
+  width: 240px; height: 240px;
+  right: -100px; top: -120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(47, 139, 255, .28), transparent 68%);
+  filter: blur(18px);
+  pointer-events: none;
+}
+
+.fwHead {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 14px 10px 16px;
+  -webkit-app-region: drag;
+}
+.fwBrand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.fwLogo {
+  width: 34px; height: 34px;
+  border-radius: 11px;
+  display: grid; place-items: center;
+  background: rgba(47, 139, 255, .16);
+  border: 1px solid rgba(151, 210, 255, .22);
+  box-shadow: 0 8px 18px rgba(47, 139, 255, .2);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.fwLogo img { width: 34px; height: 34px; object-fit: cover; }
+.fwLogo img.markLight { border-radius: 0; }
+.fwLogo .markDark { display: none; }
+html[data-theme="dark"] .fwLogo { background: none; border: none; box-shadow: none; }
+html[data-theme="dark"] .fwLogo .markLight { display: none; }
+html[data-theme="dark"] .fwLogo .markDark { display: block; }
+.fwWords { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fwWords strong { font-size: 12.5px; font-weight: 700; letter-spacing: .02em; }
+.fwWords small { font-size: 9px; color: var(--dim); }
+.fwActions { display: flex; gap: 6px; -webkit-app-region: no-drag; }
+.fwIcon {
+  width: 28px; height: 28px;
+  border-radius: 9px;
+  display: grid; place-items: center;
+  color: var(--sub);
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(151, 210, 255, .1);
+  transition: background .2s, color .2s;
+}
+.fwIcon .ico { width: 14px; height: 14px; }
+.fwIcon:hover { background: rgba(47, 139, 255, .18); color: var(--ice, #c8edff); }
+.fwIcon.on { color: var(--cyan); background: rgba(47, 139, 255, .2); border-color: rgba(111, 214, 255, .3); }
+
+.fwTabs {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  margin: 2px 16px 10px;
+  padding: 3px;
+  border-radius: 12px;
+  border: 1px solid rgba(151, 210, 255, .12);
+  background: rgba(4, 15, 28, .42);
+}
+.fwPill {
+  position: absolute;
+  left: 3px; top: 3px;
+  height: 30px;
+  width: 0;
+  border-radius: 9px;
+  background: linear-gradient(120deg, rgba(47, 139, 255, .4), rgba(111, 214, 255, .18));
+  border: 1px solid rgba(151, 210, 255, .26);
+  transition: left .3s var(--spring), width .3s var(--spring);
+}
+.fwTabs button {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 11px;
+  color: var(--dim);
+  transition: color .2s;
+}
+.fwTabs button.active { color: #fff; }
+
+.fwPanels { position: relative; z-index: 2; flex: 1; min-height: 0; }
+.fwPane { display: none; height: 100%; padding: 0 16px; flex-direction: column; }
+.fwPane.active { display: flex; animation: fwIn .3s var(--ease); }
+@keyframes fwIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.fwDevice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(151, 210, 255, .12);
+  background: rgba(4, 15, 28, .4);
+  font-size: 10.5px;
+  color: var(--sub);
+  text-align: left;
+}
+.fwDevice span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fwDevice small { font-size: 9px; color: var(--dim); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #4fe3b0; box-shadow: 0 0 7px rgba(79, 227, 176, .8); flex-shrink: 0; }
+.dot.off { background: #5f809b; box-shadow: none; }
+
+.fwDrop {
+  margin-top: 10px;
+  height: 138px;
+  border-radius: 16px;
+  border: 1.5px dashed rgba(111, 214, 255, .28);
+  background: rgba(47, 139, 255, .05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: border-color .2s, background .2s, transform .2s;
+}
+.fwDrop.hover { border-color: rgba(111, 214, 255, .68); background: rgba(47, 139, 255, .12); transform: scale(1.01); }
+.fwDropIcon {
+  width: 38px; height: 38px;
+  border-radius: 12px;
+  display: grid; place-items: center;
+  color: var(--cyan);
+  background: rgba(47, 139, 255, .14);
+  border: 1px solid rgba(151, 210, 255, .18);
+  margin-bottom: 2px;
+}
+.fwDropIcon .ico { width: 18px; height: 18px; }
+.fwDrop strong { font-size: 11.5px; font-weight: 600; }
+.fwDrop > span:not(.fwDropIcon) { font-size: 9.5px; color: var(--dim); }
+.fwPick {
+  margin-top: 4px;
+  font-size: 9.5px;
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.fwProgressList { margin-top: 9px; display: flex; flex-direction: column; gap: 7px; max-height: 104px; overflow-y: auto; }
+.fwProgressItem { padding: 9px 11px; border-radius: 12px; border: 1px solid rgba(151, 210, 255, .1); background: rgba(6, 22, 40, .58); }
+.fwProgressHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.fwProgressHead strong { font-size: 10px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fwProgressHead span { font-size: 9px; color: var(--cyan); flex-shrink: 0; }
+.fwTrack { height: 4px; border-radius: 99px; background: rgba(111, 214, 255, .11); overflow: hidden; }
+.fwTrack i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #2f8bff, #6fd6ff); transition: width .18s linear; }
+
+.fwLive { margin-top: 8px; display: flex; flex-direction: column; gap: 7px; max-height: 110px; overflow-y: auto; }
+.fwLiveRow { padding: 9px 11px; border-radius: 12px; border: 1px solid rgba(111, 214, 255, .26); background: linear-gradient(120deg, rgba(47, 139, 255, .16), rgba(6, 22, 40, .5)); }
+.fwLiveHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.fwLiveHead strong { font-size: 10px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fwLiveHead span { font-size: 9px; color: var(--cyan); flex-shrink: 0; }
+
+.fwClipActions { display: flex; gap: 7px; margin-bottom: 9px; }
+.fwClipActions button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 31px;
+  border-radius: 9px;
+  font-size: 9.5px;
+  color: var(--sub);
+  border: 1px solid rgba(151, 210, 255, .12);
+  background: rgba(4, 15, 28, .42);
+  transition: background .2s, color .2s;
+}
+.fwClipActions button:hover { background: rgba(47, 139, 255, .16); color: var(--ice, #c8edff); }
+.fwClipActions .ico { width: 12px; height: 12px; }
+
+.fwClipList { flex: 1; min-height: 0; overflow-y: auto; border-radius: 15px; border: 1px solid rgba(151, 210, 255, .1); background: rgba(5, 19, 35, .4); padding: 2px 12px; }
+.fwClipItem { display: flex; gap: 9px; padding: 11px 0; border-bottom: 1px solid rgba(151, 210, 255, .07); cursor: pointer; }
+.fwClipItem:last-child { border-bottom: none; }
+.fwClipBody { flex: 1; min-width: 0; }
+.fwClipText { font-size: 10.5px; line-height: 1.55; color: rgba(234, 246, 255, .92); white-space: pre-wrap; word-break: break-word; max-height: 56px; overflow: hidden; }
+.fwClipMeta { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: 8.5px; color: var(--dim); }
+.fwSource { font-size: 8px; padding: 1px 6px; border-radius: 99px; color: #9fe9ff; background: rgba(111, 214, 255, .12); }
+.fwCopyBtn { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; color: var(--dim); background: rgba(255, 255, 255, .04); border: 1px solid rgba(151, 210, 255, .1); align-self: center; flex-shrink: 0; }
+.fwCopyBtn:hover { color: var(--cyan); background: rgba(47, 139, 255, .18); }
+.fwClipEmpty { padding: 34px 16px; text-align: center; font-size: 10px; line-height: 1.6; color: var(--dim); }
+
+.fwFoot {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 17px;
+  font-size: 9px;
+  color: var(--dim);
+  border-top: 1px solid rgba(151, 210, 255, .08);
+}
+.fwDotMini { width: 5px; height: 5px; border-radius: 50%; background: #4fe3b0; box-shadow: 0 0 6px rgba(79, 227, 176, .8); }
+.fwDotMini.off { background: #5f809b; box-shadow: none; }
+
+.fwToast {
+  position: absolute;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%) translateY(10px);
+  z-index: 30;
+  max-width: 280px;
+  padding: 8px 14px;
+  border-radius: 99px;
+  font-size: 10px;
+  text-align: center;
+  color: var(--text);
+  background: rgba(6, 22, 40, .94);
+  border: 1px solid rgba(151, 210, 255, .22);
+  box-shadow: 0 14px 30px rgba(0, 6, 18, .5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .22s, transform .3s var(--spring);
+}
+.fwToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+
+/* ============================================================
+   浅蓝玻璃主题（悬浮窗）· 只在 html.light 下生效，深色为默认
+   ============================================================ */
+
+html.light {
+  --text: #1b2436;
+  --sub: #5d6b85;
+  --dim: #93a0b6;
+  --cyan: #4f8dff;
+  --blue: #4f8dff;
+  --ice: #33406a;
+  --stroke: rgba(126, 148, 196, .18);
+}
+
+html.light, html.light body { background: #eff5fd; }
+
+html.light .fw {
+  background:
+    radial-gradient(80% 50% at 8% 0%, #dfeaff 0%, transparent 64%),
+    radial-gradient(70% 54% at 100% 100%, #e3f0ff 0%, transparent 66%),
+    linear-gradient(158deg, #f7faff, #eef4fd 58%, #f2f8ff);
+}
+html.light .fw::after {
+  border: 1px solid rgba(255, 255, 255, .8);
+  box-shadow:
+    inset 0 0 0 1px rgba(126, 148, 196, .14),
+    inset 0 1px 0 rgba(255, 255, 255, .95);
+}
+html.light .fwOrb { background: radial-gradient(circle, rgba(160, 180, 255, .3), transparent 68%); }
+
+html.light .fwLogo {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+html.light .fwWords small { color: #93a0b6; }
+html.light .fwIcon {
+  color: #5d6b85;
+  background: rgba(255, 255, 255, .7);
+  border: 1px solid rgba(126, 148, 196, .18);
+}
+html.light .fwIcon:hover { background: #fff; color: #33406a; }
+html.light .fwIcon.on { color: #4a58d6; background: rgba(91, 108, 255, .12); border-color: rgba(91, 108, 255, .26); }
+
+html.light .fwTabs { border-color: rgba(126, 148, 196, .18); background: rgba(242, 246, 254, .9); }
+html.light .fwPill {
+  background: #fff;
+  border: 1px solid rgba(126, 148, 196, .2);
+  box-shadow: 0 6px 16px rgba(70, 94, 158, .1);
+}
+html.light .fwTabs button { color: #8b97ad; }
+html.light .fwTabs button.active { color: #1b2436; }
+
+html.light .fwDevice {
+  border-color: rgba(126, 148, 196, .2);
+  background: rgba(255, 255, 255, .72);
+  color: #5d6b85;
+}
+html.light .dot.off { background: #b6c0d2; box-shadow: none; }
+
+html.light .fwDrop {
+  border-color: rgba(91, 108, 255, .26);
+  background: rgba(255, 255, 255, .55);
+}
+html.light .fwDrop.hover { border-color: rgba(91, 108, 255, .56); background: rgba(91, 108, 255, .08); }
+html.light .fwDropIcon {
+  color: #5b6cff;
+  background: rgba(91, 108, 255, .1);
+  border-color: rgba(91, 108, 255, .18);
+}
+html.light .fwDrop > span:not(.fwDropIcon) { color: #93a0b6; }
+html.light .fwPick { color: #5b6cff; }
+
+html.light .fwProgressItem { border-color: rgba(126, 148, 196, .16); background: rgba(255, 255, 255, .82); }
+html.light .fwProgressHead span { color: #5b6cff; }
+html.light .fwTrack { background: rgba(126, 148, 196, .16); }
+html.light .fwTrack i { background: linear-gradient(90deg, #4f8dff, #7cc0ff); }
+
+html.light .fwLiveRow {
+  border-color: rgba(91, 108, 255, .22);
+  background: linear-gradient(120deg, rgba(91, 108, 255, .1), rgba(255, 255, 255, .85));
+}
+html.light .fwLiveHead span { color: #5b6cff; }
+
+html.light .fwClipActions button {
+  color: #5d6b85;
+  border-color: rgba(126, 148, 196, .18);
+  background: rgba(255, 255, 255, .72);
+}
+html.light .fwClipActions button:hover { background: #fff; color: #33406a; }
+
+html.light .fwClipList {
+  border-color: rgba(126, 148, 196, .16);
+  background: rgba(255, 255, 255, .72);
+}
+html.light .fwClipItem { border-bottom-color: rgba(126, 148, 196, .14); }
+html.light .fwClipText { color: #26314a; }
+html.light .fwClipMeta { color: #93a0b6; }
+html.light .fwSource { color: #4a58d6; background: rgba(91, 108, 255, .12); }
+html.light .fwCopyBtn { color: #8b97ad; background: rgba(255, 255, 255, .86); border-color: rgba(126, 148, 196, .18); }
+html.light .fwCopyBtn:hover { color: #5b6cff; background: rgba(91, 108, 255, .1); }
+html.light .fwClipEmpty { color: #93a0b6; }
+
+html.light .fwFoot { border-top-color: rgba(126, 148, 196, .16); color: #93a0b6; }
+html.light .fwDotMini.off { background: #b6c0d2; box-shadow: none; }
+
+html.light .fwToast {
+  color: #1b2436;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid rgba(255, 255, 255, .9);
+  box-shadow: 0 16px 36px rgba(62, 88, 150, .18), inset 0 0 0 1px rgba(126, 148, 196, .12);
+}

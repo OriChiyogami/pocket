@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const { spawn } = require('child_process');
 const { describePackage } = require('./pkt-reader');
 const { createZip } = require('./zip');
 
@@ -299,6 +300,87 @@ function readDeviceId(libraryDir) {
   return id;
 }
 
+/* ------------------------------------------------------------------ 剪贴板 */
+
+const CLIPBOARD_MAX = 50;
+const CLIPBOARD_TEXT_MAX = 100000;
+
+function clipboardFile(libraryDir) {
+  return path.join(libraryDir, 'clipboard.json');
+}
+
+function loadClipboard(libraryDir) {
+  try {
+    const json = JSON.parse(fs.readFileSync(clipboardFile(libraryDir), 'utf8'));
+    const items = Array.isArray(json && json.items) ? json.items : [];
+    return items
+      .filter((it) => it && typeof it.text === 'string' && it.text.trim() && it.text.trim() !== '[object Object]')
+      .map((it) => ({
+        id: String(it.id || crypto.randomBytes(8).toString('hex')),
+        text: String(it.text),
+        time: Number(it.time) || Date.now(),
+        source: it.source === 'phone' ? 'phone' : 'pc'
+      }))
+      .sort((a, b) => b.time - a.time)
+      .slice(0, CLIPBOARD_MAX);
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveClipboard(libraryDir, items) {
+  const file = clipboardFile(libraryDir);
+  const tmp = file + '.tmp';
+  try {
+    fs.writeFileSync(tmp, JSON.stringify({ items }, null, 2), 'utf8');
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    fs.renameSync(tmp, file);
+  } catch (e) {}
+}
+
+function addClipboard(libraryDir, text, source, time) {
+  const raw = String(text == null ? '' : text);
+  if (!raw.trim()) return null;
+  if (/^\[object Object\]$/.test(raw.trim())) return null;
+  const clean = raw.slice(0, CLIPBOARD_TEXT_MAX);
+  const stamp = Number(time) > 0 ? Number(time) : Date.now();
+  const items = loadClipboard(libraryDir);
+  const index = items.findIndex((it) => it.text === clean);
+  let entry;
+  if (index >= 0) {
+    const old = items.splice(index, 1)[0];
+    const oldTime = Number(old.time) || 0;
+    entry = {
+      ...old,
+      time: Math.max(oldTime, stamp),
+      source: stamp >= oldTime ? (source || old.source || 'pc') : (old.source || 'pc')
+    };
+  } else {
+    entry = {
+      id: crypto.randomBytes(8).toString('hex'),
+      text: clean,
+      time: stamp,
+      source: source === 'phone' ? 'phone' : 'pc'
+    };
+  }
+  items.unshift(entry);
+  items.sort((a, b) => b.time - a.time);
+  saveClipboard(libraryDir, items.slice(0, CLIPBOARD_MAX));
+  return entry;
+}
+
+function removeClipboard(libraryDir, id) {
+  const items = loadClipboard(libraryDir);
+  const next = items.filter((it) => it.id !== id);
+  if (next.length === items.length) return false;
+  saveClipboard(libraryDir, next);
+  return true;
+}
+
+function clearClipboard(libraryDir) {
+  saveClipboard(libraryDir, []);
+}
+
 function renderPage(options) {
   const { name, port, addresses, apps, host } = options;
   const library = options.library || [];
@@ -494,6 +576,7 @@ function renderPage(options) {
     </div>
     <div class="headRight">
       <div class="status"><span class="dot"></span>服务运行中</div>
+      <button class="shutdown" id="floatBtn" title="在桌面打开悬浮小窗">悬浮窗</button>
       <button class="shutdown" id="shutdown">关闭服务</button>
     </div>
   </header>
@@ -565,6 +648,23 @@ function renderPage(options) {
   </div>
 
   <div class="grid" id="xfGrid"></div>
+
+  <div class="sectionTitle">
+    <h2>剪贴板</h2>
+    <span class="count" id="clCount">0</span>
+    <span class="hint">电脑与手机共享的多轮历史 · 最多 50 条 · 悬浮窗会自动记录 Windows 剪贴板</span>
+  </div>
+
+  <div class="panel" style="margin-top:0">
+    <div class="steps">
+      <button class="hostDl" id="clFloat">打开悬浮窗</button>
+      <button class="mini text" id="clRead">读取本机剪贴板</button>
+      <button class="mini text" id="clRefresh">刷新</button>
+      <span class="xfStatus" id="clStatus" style="margin:0"></span>
+    </div>
+  </div>
+
+  <div class="grid" id="clGrid" style="margin-top:12px"></div>
 
   <footer>口袋 Pocket · 电脑端服务 · 端口 ${port} · 目录 ${escapeHtml(options.dir)}</footer>
 </div>
@@ -962,6 +1062,122 @@ function renderPage(options) {
   setInterval(refreshDevices, 2500);
   setInterval(refreshFiles, 8000);
 
+  // ------------------------------------------------ 剪贴板
+  var clGrid = document.getElementById('clGrid');
+  var clCount = document.getElementById('clCount');
+  var clStatus = document.getElementById('clStatus');
+  var clItems = [];
+
+  function setCl(text, tone) {
+    if (!clStatus) return;
+    clStatus.textContent = text || '';
+    clStatus.style.color = tone === 'error' ? '#E5484D' : '';
+  }
+
+  function renderClipboard() {
+    clCount.textContent = clItems.length;
+    if (!clItems.length) {
+      clGrid.innerHTML = '<div class="empty"><div class="emptyIcon">✂</div><h3>还没有剪贴板记录</h3>' +
+        '<p>打开悬浮窗后，在电脑上复制文字会自动收进来；手机「剪贴板」应用点同步也能看到</p></div>';
+      return;
+    }
+    clGrid.innerHTML = clItems.map(function (item, index) {
+      var full = String(item.text || '');
+      var first = full.split(/\r?\n/)[0].slice(0, 60);
+      var source = item.source === 'phone' ? '手机' : '电脑';
+      return '<div class="card">' +
+        '<div class="icon lib" style="--accent:#FF9F0A"><span>文</span></div>' +
+        '<div class="meta"><div class="row1"><h3>' + esc(first || '（空白）') + '</h3>' +
+        '<span class="ver">' + source + '</span></div>' +
+        '<div class="sub">' + new Date(item.time).toLocaleString('zh-CN') + ' · ' + full.length + ' 字</div></div>' +
+        '<div class="ops"><button class="mini text" data-cl-copy="' + index + '">复制</button>' +
+        '<button class="mini danger" data-cl-rm="' + esc(item.id) + '">✕</button></div></div>';
+    }).join('');
+  }
+
+  function refreshClipboard() {
+    fetch('/api/clipboard').then(function (r) { return r.json(); }).then(function (j) {
+      clItems = (j && j.items) || [];
+      renderClipboard();
+    }).catch(function () {});
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      var area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.appendChild(area);
+      area.select();
+      var ok = false;
+      try { ok = document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(area);
+      ok ? resolve() : reject(new Error('浏览器不允许写入剪贴板'));
+    });
+  }
+
+  function startFloat() {
+    fetch('/api/float/start', { method: 'POST' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok) throw new Error(j.error || '启动失败');
+      setCl('悬浮窗已打开，看屏幕右下角');
+    }).catch(function (err) {
+      setCl('悬浮窗启动失败：' + err.message, 'error');
+      alert('悬浮窗启动失败：' + err.message);
+    });
+  }
+
+  document.getElementById('floatBtn').addEventListener('click', startFloat);
+  document.getElementById('clFloat').addEventListener('click', startFloat);
+  document.getElementById('clRefresh').addEventListener('click', refreshClipboard);
+  document.getElementById('clRead').addEventListener('click', function () {
+    if (!navigator.clipboard || !window.isSecureContext) {
+      setCl('浏览器不允许网页读剪贴板，请用悬浮窗记录', 'error');
+      return;
+    }
+    navigator.clipboard.readText().then(function (text) {
+      if (!text || !text.trim()) {
+        setCl('剪贴板里没有文字', 'error');
+        return;
+      }
+      return fetch('/api/clipboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text, source: 'pc' })
+      }).then(function (r) { return r.json(); }).then(function () {
+        setCl('已记录当前剪贴板');
+        refreshClipboard();
+      });
+    }).catch(function (err) {
+      setCl('读取失败：' + (err.message || err), 'error');
+    });
+  });
+
+  clGrid.addEventListener('click', function (e) {
+    var rm = e.target.closest ? e.target.closest('[data-cl-rm]') : null;
+    if (rm) {
+      if (!confirm('删除这条剪贴板记录？')) return;
+      fetch('/api/clipboard/' + encodeURIComponent(rm.getAttribute('data-cl-rm')), { method: 'DELETE' })
+        .then(function (r) { return r.json(); }).then(function (j) {
+          if (j.ok) refreshClipboard(); else alert('删除失败');
+        });
+      return;
+    }
+    var cp = e.target.closest ? e.target.closest('[data-cl-copy]') : null;
+    if (!cp) return;
+    var item = clItems[Number(cp.getAttribute('data-cl-copy'))];
+    if (!item) return;
+    copyText(item.text).then(function () {
+      setCl('已复制到电脑剪贴板');
+    }).catch(function (err) {
+      setCl(err.message, 'error');
+    });
+  });
+
+  refreshClipboard();
+  setInterval(refreshClipboard, 4000);
+
   var shutdown = document.getElementById('shutdown');
   shutdown.addEventListener('click', function () {
     if (!confirm('关闭电脑端服务？\\n关闭后手机暂时无法从这台电脑导入，重新双击桌面快捷方式即可再启动。')) return;
@@ -1131,6 +1347,84 @@ function startServer(options) {
       if (pathname === '/api/library') {
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify({ ok: true, library: scanHtmlLibrary(libraryDir) }));
+        return;
+      }
+
+      // ---------------------------------------------------------- 剪贴板
+      if (req.method === 'OPTIONS' && pathname.startsWith('/api/clipboard')) {
+        res.writeHead(204, {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Range'
+        });
+        res.end();
+        return;
+      }
+
+      if (pathname === '/api/clipboard' && req.method === 'GET') {
+        sendJson(res, 200, { ok: true, items: loadClipboard(libraryDir) });
+        return;
+      }
+
+      if (pathname === '/api/clipboard' && req.method === 'POST') {
+        const raw = (await readBody(req, 1024 * 1024)).toString('utf8') || '{}';
+        let payload = {};
+        try { payload = JSON.parse(raw); } catch (e) { payload = {}; }
+        const entry = addClipboard(libraryDir, payload.text, payload.source, payload.time);
+        if (!entry) {
+          sendJson(res, 400, { error: 'text 不能为空' });
+          return;
+        }
+        sendJson(res, 200, { ok: true, item: entry });
+        return;
+      }
+
+      if (pathname === '/api/clipboard/clear' && req.method === 'POST') {
+        clearClipboard(libraryDir);
+        sendJson(res, 200, { ok: true });
+        return;
+      }
+
+      if (pathname.startsWith('/api/clipboard/') && req.method === 'DELETE') {
+        const id = pathname.slice('/api/clipboard/'.length);
+        const ok = !!id && removeClipboard(libraryDir, id);
+        sendJson(res, ok ? 200 : 404, { ok });
+        return;
+      }
+
+      // 打开电脑端应用（Electron 桌面程序，悬浮球 + 资源库）
+      if (pathname === '/api/float/start' && req.method === 'POST') {
+        const toolsDir = path.resolve(__dirname, '..', '..', 'tools');
+        const launcher = path.join(toolsDir, 'pocket-desktop.cmd');
+        if (!fs.existsSync(launcher)) {
+          sendJson(res, 500, { error: '找不到桌面应用启动脚本 tools/pocket-desktop.cmd' });
+          return;
+        }
+        try {
+          let logFd = 'ignore';
+          try {
+            logFd = fs.openSync(path.join(dir, '.pocket-float.log'), 'a');
+          } catch (e) {
+            logFd = 'ignore';
+          }
+          const child = spawn(
+            'cmd.exe',
+            ['/d', '/s', '/c', 'pocket-desktop.cmd'],
+            {
+              cwd: toolsDir,
+              detached: false,
+              stdio: ['ignore', logFd, logFd],
+              windowsHide: true
+            }
+          );
+          if (typeof logFd === 'number') {
+            try { fs.closeSync(logFd); } catch (e) {}
+          }
+          child.unref();
+          sendJson(res, 200, { ok: true, mode: 'electron' });
+        } catch (e) {
+          sendJson(res, 500, { error: e.message || '桌面应用启动失败' });
+        }
         return;
       }
 

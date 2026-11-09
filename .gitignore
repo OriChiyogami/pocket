@@ -4,6 +4,7 @@
 **/build/
 android/local.properties
 android/image-secrets.properties
+android/.kotlin/
 
 # 产物
 dist/*.apk
@@ -11,13 +12,21 @@ dist/*.pkt
 dist/pocket-host.json
 dist/.pocket-server.json
 dist/.pocket-server*.log
+dist/.pocket-float.log
+dist/desktop/
 library/
+.trae-html-share-packages/
 
 # 个人内容（不公开，仅本地保留）
 examples/kaoyan-english/
 .uploads/
 .trae/
+.workbuddy/
 .screenshots/
+tmp-*/
+
+# 本地配置
+android/keystore.properties
 
 # 编辑器
 .idea/
@@ -31,3 +40,7 @@ Thumbs.db
 
 # 生成物
 tools/pocket-*.ico
+
+# 电脑端桌面壳
+desktop/node_modules/
+desktop/dist/

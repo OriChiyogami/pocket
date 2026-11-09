@@ -224,6 +224,23 @@ interface DeviceInfo {
 ### `pocket.clipboard.read(): Promise<string>` · `pocket.clipboard.write(text)`
 需要 `clipboard` 权限。
 
+### 多轮剪贴板历史（1.4.0）
+
+```js
+const list = await pocket.clipboard.history();      // [{id,text,time,source:'phone'|'pc'}]
+await pocket.clipboard.add(text, 'phone');          // 写入历史（按文字去重，最多 50 条）
+await pocket.clipboard.remove(id);
+await pocket.clipboard.clear();                     // 只清本机历史
+await pocket.clipboard.copy(id);                    // 把历史里的一条写进系统剪贴板
+const r = await pocket.clipboard.sync();            // 拉取电脑端历史并合并：{added,total,peer}
+pocket.on('clipboard.changed', fn);                 // 历史变化（新增/删除/同步）
+```
+
+- 需要 `clipboard` 权限。
+- `history()` 的列表是手机本地历史与电脑端历史的并集（同步后写入本地），`source` 标记来源。
+- `add/remove/clear` 是同步调用；`copy/sync` 是异步调用。
+- Android 10+ 限制后台读取剪贴板，所以自动记录只发生在「剪贴板」应用打开时（会触发系统的一次性提示）。
+
 ### `pocket.share.text({ text, subject? })`
 调起系统分享面板。需要 `share` 权限。
 

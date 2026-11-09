@@ -1,0 +1,77 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+/* 悬浮球：直接用新图标（浅蓝渐变玻璃 P）圆形裁切，外面只留一圈柔光，不再向窗口外发光。 */
+.ball {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform .16s ease, filter .24s ease;
+  will-change: transform;
+  isolation: isolate;
+}
+
+.ballArt {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  box-shadow: 0 3px 9px rgba(43, 78, 163, .2);
+}
+
+/* 边缘一圈冷光，让球在浅色桌面上仍然能立起来 */
+.ball::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: 50%;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, .5),
+    inset 0 -8px 14px rgba(73, 96, 214, .22);
+  pointer-events: none;
+}
+
+.ballGlow {
+  position: absolute;
+  inset: 6px;
+  z-index: 1;
+  border-radius: 50%;
+  filter: blur(10px);
+  background: radial-gradient(circle at 50% 58%, rgba(122, 148, 255, .5), rgba(150, 196, 255, .18) 62%, transparent 76%);
+  pointer-events: none;
+}
+
+.ball:hover {
+  transform: scale(1.045);
+  filter: brightness(1.04);
+}
+
+.ball.dragging {
+  transform: scale(.94);
+  cursor: grabbing;
+}

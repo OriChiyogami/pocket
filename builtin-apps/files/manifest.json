@@ -2,15 +2,15 @@
   "schema": "pocket.app/1",
   "id": "com.pocket.files",
   "name": "口袋文件",
-  "version": "1.0.1",
+  "version": "1.3.0",
   "entry": "index.html",
   "description": "管理通过口袋互传收发的文件：预览、重命名、删除、另存、发送",
-  "accent": "#7C5CFF",
+  "accent": "#141414",
   "display": {
     "orientation": "auto",
     "statusBar": "light",
     "fullscreen": false,
-    "background": "#FFF7F6FA"
+    "background": "#FFF5F5F2"
   },
   "permissions": []
 }

@@ -66,7 +66,7 @@ data class InstalledApp(
             name = o.optString("name", "未命名"),
             version = o.optString("version", "1.0.0"),
             description = o.optString("description", ""),
-            accent = o.optString("accent", "#7C5CFF"),
+            accent = o.optString("accent", "#2F8BFF"),
             entry = o.optString("entry", "index.html"),
             orientation = o.optString("orientation", "auto"),
             statusBar = o.optString("statusBar", "auto"),

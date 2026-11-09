@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -67,6 +68,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -94,6 +96,7 @@ fun ImageGenScreen(
 
     var prompt by remember { mutableStateOf("") }
     var size by remember { mutableStateOf("auto") }
+    var customSize by remember { mutableStateOf("") }
     var quality by remember { mutableStateOf("auto") }
     var count by remember { mutableStateOf(1) }
     val refs = remember { mutableStateListOf<Uri>() }
@@ -137,11 +140,24 @@ fun ImageGenScreen(
     fun generate() {
         val text = prompt.trim()
         if (text.isEmpty() || busy) return
+        val custom = customSize.trim().replace("×", "x").replace(" ", "").lowercase()
+        val finalSize = if (custom.isEmpty()) {
+            size
+        } else {
+            val match = Regex("^(\\d{2,4})x(\\d{2,4})$").matchEntire(custom)
+            val w = match?.groupValues?.get(1)?.toIntOrNull()
+            val h = match?.groupValues?.get(2)?.toIntOrNull()
+            if (w == null || h == null || w !in 64..4096 || h !in 64..4096) {
+                error = "自定义尺寸请填「宽x高」，例如 1280x720（64–4096）"
+                return
+            }
+            "${w}x${h}"
+        }
         busy = true
         error = ""
         results.clear()
         val refUris = refs.toList()
-        val (s, q, n) = Triple(size, quality, count)
+        val (s, q, n) = Triple(finalSize, quality, count)
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
@@ -302,6 +318,19 @@ fun ImageGenScreen(
                 selected = size,
                 labelOf = { if (it == "auto") "自动" else it.replace("x", " × ") },
                 onSelect = { size = it }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = customSize,
+                onValueChange = { input ->
+                    customSize = input.filter { it.isDigit() || it == 'x' || it == 'X' || it == '×' }.take(9)
+                },
+                label = { Text("自定义尺寸（可选）") },
+                placeholder = { Text("如 1280x720，填了会覆盖上面的尺寸") },
+                singleLine = true,
+                shape = RoundedCornerShape(14.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
             ChoiceRow(

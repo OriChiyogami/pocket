@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>口袋 Pocket</title>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="light.css" id="themeLight">
+</head>
+<body>
+<svg style="display:none" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.6" y="3.6" width="7" height="7" rx="2.2"/><rect x="13.4" y="3.6" width="7" height="7" rx="2.2"/><rect x="3.6" y="13.4" width="7" height="7" rx="2.2"/><rect x="13.4" y="13.4" width="7" height="7" rx="2.2"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.2c0-1.2 1-2.2 2.2-2.2h3.4l2 2.2h7.2c1.2 0 2.2 1 2.2 2.2v8.2c0 1.2-1 2.2-2.2 2.2H5.7c-1.2 0-2.2-1-2.2-2.2V7.2Z"/><path d="M3.7 10.4h16.6"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="6" y="4.5" width="12" height="16" rx="3"/><path d="M9.5 4.5V3.8c0-.7.6-1.3 1.3-1.3h2.4c.7 0 1.3.6 1.3 1.3v.7"/><path d="M9.5 10.5h5M9.5 14h5"/></symbol>
+  <symbol id="i-devices" viewBox="0 0 24 24"><rect x="2.8" y="4.5" width="12.4" height="9.2" rx="2"/><path d="M6.4 17.2h5.2M9 13.7v3.5"/><rect x="16.2" y="8.2" width="5" height="11.3" rx="1.8"/><path d="M18.7 17.2h.1"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><path d="M4 5.2c0-.7.6-1.3 1.3-1.3h4.1c.7 0 1.3.6 1.3 1.3v14.3H5.3c-.7 0-1.3-.6-1.3-1.3V5.2Z"/><path d="M10.7 9.2h4.2c.7 0 1.3.6 1.3 1.3v8.9h-5.5V9.2Z"/><path d="m17.6 6.4 2.3 12.6"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.1"/><path d="M19.3 13.5a7.8 7.8 0 0 0 0-3l1.7-1.3-1.8-3.1-2 .8a7.6 7.6 0 0 0-2.6-1.5L14.3 3h-3.6l-.3 2.4A7.6 7.6 0 0 0 7.8 6.9l-2-.8-1.8 3.1 1.7 1.3a7.8 7.8 0 0 0 0 3l-1.7 1.3 1.8 3.1 2-.8a7.6 7.6 0 0 0 2.6 1.5l.3 2.4h3.6l.3-2.4a7.6 7.6 0 0 0 2.6-1.5l2 .8 1.8-3.1-1.7-1.3Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m15.4 15.4 4.1 4.1"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M20.5 3.5 9.8 14.2"/><path d="M20.5 3.5 14.2 20.5l-4.4-6.3-6.3-4.4L20.5 3.5Z"/></symbol>
+  <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11.2A8 8 0 0 0 6.2 6.1L4 8.2"/><path d="M4 4.2v4h4"/><path d="M4 12.8a8 8 0 0 0 13.8 5.1l2.2-2.1"/><path d="M20 19.8v-4h-4"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9 7V4.8c0-.7.6-1.3 1.3-1.3h3.4c.7 0 1.3.6 1.3 1.3V7"/><path d="M6.5 7 7.4 20c.1.9.8 1.5 1.7 1.5h5.8c.9 0 1.6-.6 1.7-1.5L17.5 7"/><path d="M10 11v6M14 11v6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4.5"/><path d="m6.8 9.7 5.2-5.2 5.2 5.2"/><path d="M4.5 16.5v1.7c0 1.2 1 2.3 2.3 2.3h10.4c1.3 0 2.3-1.1 2.3-2.3v-1.7"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5V16"/><path d="m6.8 10.8 5.2 5.2 5.2-5.2"/><path d="M4.5 16.5v1.7c0 1.2 1 2.3 2.3 2.3h10.4c1.3 0 2.3-1.1 2.3-2.3v-1.7"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5.5 6.5 6.5L9 18.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-command" viewBox="0 0 24 24"><path d="M9 6.5A2.5 2.5 0 1 0 6.5 9H9V6.5ZM9 17.5A2.5 2.5 0 1 1 6.5 15H9v2.5ZM15 6.5A2.5 2.5 0 1 1 17.5 9H15V6.5ZM15 17.5a2.5 2.5 0 1 0 2.5-2.5H15v2.5Z"/><rect x="9" y="9" width="6" height="6"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2.8" width="10" height="18.4" rx="2.6"/><path d="M10.3 18.2h3.4"/></symbol>
+  <symbol id="i-pc" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.4"/><path d="M8 20h8M12 16v4"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.4 4.4L19 7.3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.2" y="8.2" width="11" height="11" rx="2.6"/><path d="M6 16h-.5A2.5 2.5 0 0 1 3 13.5v-8A2.5 2.5 0 0 1 5.5 3h8A2.5 2.5 0 0 1 16 5.5V6"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 19.5h16"/><path d="M6.5 16V10M11 16V5.5M15.5 16v-4M20 16V8"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9.8a6 6 0 1 0-12 0c0 5-2 5.7-2 5.7h16s-2-.7-2-5.7Z"/><path d="M10.2 19.2a2 2 0 0 0 3.6 0"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="m9 3.8 11.2 11.2-2.8 1.2-3.3 3.3-1.2 2.8L4.7 8.1l2.8-1.2 3.3-3.3L9 3.8Z"/><path d="m8.6 15.4-4.8 4.8"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10"/><path d="M19.5 4.5 12 12"/><path d="M18 13.5v5c0 1.1-.9 2-2 2H5.5c-1.1 0-2-.9-2-2V8c0-1.1.9-2 2-2h5"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11.5A8 8 0 0 0 6.3 6.4L4 8.6"/><path d="M4 4.5v4.1h4.1"/><path d="M4 12.5a8 8 0 0 0 13.7 5.1l2.3-2.2"/><path d="M20 19.5v-4.1h-4.1"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-app" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5"/><path d="M9 9.5h6M9 13h6M9 16.5h3.5"/></symbol>
+  <symbol id="i-html" viewBox="0 0 24 24"><path d="m8.5 8-4 4 4 4"/><path d="m15.5 8 4 4-4 4"/><path d="m13.5 5.5-3 13"/></symbol>
+  <symbol id="i-apk" viewBox="0 0 24 24"><rect x="6.5" y="2.8" width="11" height="18.4" rx="2.6"/><path d="M9.6 18.2h4.8"/><path d="M9.5 8.2 8 6.4M14.5 8.2 16 6.4"/><path d="M9 10.8h6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></symbol>
+  <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6.5h16l-6.2 7.3v5.4l-3.6 1.8v-7.2L4 6.5Z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.1 5.4L19.5 10l-5.4 2.1L12 17.5l-2.1-5.4L4.5 10l5.4-1.6L12 3Z"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M14.8 4.9 19 9.1"/><path d="M4.5 19.5 6 14.2 16.9 3.3c.7-.7 1.8-.7 2.5 0l1.3 1.3c.7.7.7 1.8 0 2.5L9.8 18 4.5 19.5Z"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <div class="backdrop" aria-hidden="true">
+    <i class="orb o1"></i><i class="orb o2"></i><i class="orb o3"></i>
+    <span class="grain"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brandLogo">
+        <img class="markLight" src="../assets/pocket-icon.png" alt="">
+        <img class="markDark" src="../assets/pocket-p-dark.png" alt="">
+      </span>
+      <span class="brandWords">
+        <img class="wordLight" src="../assets/pocket-word-light.png" alt="pocket">
+        <img class="wordDark" src="../assets/pocket-word-dark.png" alt="">
+        <em>口袋</em>
+      </span>
+    </div>
+
+    <nav class="mainNav" id="mainNav">
+      <span class="navPill" id="navPill"></span>
+      <div class="navGroupLabel">工作台</div>
+      <button data-page="overview" class="active"><svg class="ico"><use href="#i-grid"></use></svg><span>概览</span><small>01</small></button>
+      <button data-page="files"><svg class="ico"><use href="#i-folder"></use></svg><span>文件</span><small>02</small></button>
+      <button data-page="clipboard"><svg class="ico"><use href="#i-clipboard"></use></svg><span>剪贴板</span><small>03</small></button>
+      <button data-page="devices"><svg class="ico"><use href="#i-devices"></use></svg><span>设备</span><small>04</small></button>
+      <div class="navGroupLabel">管理</div>
+      <button data-page="library"><svg class="ico"><use href="#i-library"></use></svg><span>资源库</span><small>05</small></button>
+      <button data-page="settings"><svg class="ico"><use href="#i-settings"></use></svg><span>设置</span><small>06</small></button>
+    </nav>
+
+    <div class="sideFoot">
+      <div class="sideStatus" id="sideStatus">
+        <div class="ssRow"><i class="ssDot" id="ssDot"></i><strong id="ssTitle">服务连接中</strong></div>
+        <small id="ssSub">127.0.0.1:8570</small>
+      </div>
+      <button class="sideUser" id="sideUser">
+        <span class="avatar">
+          <img class="markLight" src="../assets/pocket-icon.png" alt="">
+          <img class="markDark" src="../assets/pocket-p-dark.png" alt="">
+        </span>
+        <span class="sideUserWords"><strong>Pocket Desktop</strong><small id="versionSmall">v1.0.0</small></span>
+        <svg class="ico"><use href="#i-chevron"></use></svg>
+      </button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="greet">
+        <h1 id="greetText">晚上好</h1>
+        <p id="dateText">11 月 8 日 · 星期六</p>
+      </div>
+      <div class="topActions">
+        <button class="searchPill" id="searchBtn">
+          <svg class="ico"><use href="#i-search"></use></svg>
+          <span>搜索页面、剪贴板、文件…</span>
+          <kbd>Ctrl K</kbd>
+        </button>
+        <button class="iconBtn" id="bellBtn" title="动态"><svg class="ico"><use href="#i-bell"></use></svg><i class="dotBadge" id="bellDot"></i></button>
+        <button class="floatChip" id="floatBtn" title="剪贴板悬浮窗 Ctrl+Shift+B"><svg class="ico"><use href="#i-pin"></use></svg><span>悬浮窗</span></button>
+        <span class="topDivider"></span>
+        <button class="iconBtn" id="ballBtn" title="收起到悬浮球"><svg class="ico"><use href="#i-minus"></use></svg></button>
+        <button class="iconBtn danger" id="closeBtn" title="退出口袋"><svg class="ico"><use href="#i-close"></use></svg></button>
+      </div>
+    </header>
+
+    <main class="pages" id="pages">
+      <!-- ------------------------------------------------------------ 概览 -->
+      <section class="page active" data-page="overview">
+        <div class="metrics">
+          <article class="glass metric tilt" data-go="devices">
+            <div class="metricHead"><span>在线设备</span><span class="metricIcon"><svg class="ico"><use href="#i-devices"></use></svg></span></div>
+            <strong class="metricValue" data-count="devices">0</strong>
+            <div class="metricFoot"><span class="trend">实时发现</span>
+              <svg class="spark" viewBox="0 0 84 26" preserveAspectRatio="none"><path d="M1 20 12 17 23 19 34 12 45 15 56 8 67 11 83 4"/></svg>
+            </div>
+          </article>
+          <article class="glass metric tilt" data-go="clipboard">
+            <div class="metricHead"><span>剪贴板</span><span class="metricIcon"><svg class="ico"><use href="#i-clipboard"></use></svg></span></div>
+            <strong class="metricValue" data-count="clipboard">0</strong>
+            <div class="metricFoot"><span class="trend">多轮历史</span>
+              <svg class="spark" viewBox="0 0 84 26" preserveAspectRatio="none"><path d="M1 18 12 20 23 13 34 16 45 9 56 13 67 6 83 8"/></svg>
+            </div>
+          </article>
+          <article class="glass metric tilt" data-go="files">
+            <div class="metricHead"><span>收到文件</span><span class="metricIcon"><svg class="ico"><use href="#i-folder"></use></svg></span></div>
+            <strong class="metricValue" data-count="files">0</strong>
+            <div class="metricFoot"><span class="trend">本机保存</span>
+              <svg class="spark" viewBox="0 0 84 26" preserveAspectRatio="none"><path d="M1 21 12 15 23 17 34 10 45 14 56 7 67 12 83 5"/></svg>
+            </div>
+          </article>
+          <article class="glass metric tilt" data-go="files">
+            <div class="metricHead"><span>今日传输</span><span class="metricIcon"><svg class="ico"><use href="#i-chart"></use></svg></span></div>
+            <strong class="metricValue" data-count="today">0</strong>
+            <div class="metricFoot"><span class="trend">今日收到</span>
+              <svg class="spark" viewBox="0 0 84 26" preserveAspectRatio="none"><path d="M1 22 12 18 23 20 34 14 45 17 56 10 67 13 83 6"/></svg>
+            </div>
+          </article>
+        </div>
+
+        <div class="midRow">
+          <article class="glass chartCard tilt">
+            <div class="cardHead">
+              <div><h2>剪贴板活跃度</h2><p>最近一段时间 · 按记录时间统计</p></div>
+              <div class="seg" id="chartSeg">
+                <button class="on" data-range="7">7 天</button>
+                <button data-range="14">14 天</button>
+              </div>
+            </div>
+            <div class="chartBody">
+              <div class="chartAxis"><span id="axisMax">10</span><span id="axisMid">5</span><span>0</span></div>
+              <div class="chartBars" id="chartBars"></div>
+            </div>
+          </article>
+
+          <article class="darkCard tilt" id="focusCard">
+            <span class="darkGlow" aria-hidden="true"></span>
+            <div class="darkTop"><span class="eyebrow">CURRENT LINK</span><span class="darkTag" id="focusTag">局域网</span></div>
+            <h2 id="focusName">等待手机</h2>
+            <p id="focusMeta">让手机打开口袋，连同一个 Wi-Fi</p>
+            <div class="focusStats">
+              <div><strong id="focusClip">0</strong><span>剪贴板</span></div>
+              <div><strong id="focusFiles">0</strong><span>收到文件</span></div>
+              <div><strong id="focusSpeed">0</strong><span>KB/s</span></div>
+            </div>
+            <button class="darkBtn" id="focusSend"><svg class="ico"><use href="#i-send"></use></svg>发送文件</button>
+            <div class="darkFoot"><i class="ssDot" id="focusDot"></i><span id="focusStatus">服务连接中</span></div>
+          </article>
+        </div>
+
+        <div class="bottomRow">
+          <article class="glass listCard">
+            <div class="cardHead"><div><h2>最近剪贴板</h2><p>手机和电脑混排</p></div><button class="textBtn" data-go="clipboard">查看全部<svg class="ico"><use href="#i-chevron"></use></svg></button></div>
+            <div class="miniList" id="recentClips"></div>
+          </article>
+          <article class="glass listCard">
+            <div class="cardHead"><div><h2>最近文件</h2><p>手机发给这台电脑</p></div><button class="textBtn" data-go="files">查看全部<svg class="ico"><use href="#i-chevron"></use></svg></button></div>
+            <div class="miniList" id="recentFiles"></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 文件 -->
+      <section class="page" data-page="files">
+        <div class="pageHead">
+          <div><span class="eyebrow">FILES</span><h1>文件互传</h1><p>同一 Wi-Fi 下直连手机，不限大小、不压缩。</p></div>
+          <div class="pageActions">
+            <span class="pageBadge" id="filesBadge">0 个文件</span>
+            <button class="primaryBtn" id="pickBtn"><svg class="ico"><use href="#i-plus"></use></svg>选择文件</button>
+          </div>
+        </div>
+
+        <div class="filesGrid">
+          <article class="glass paneCard">
+            <div class="cardHead">
+              <div><h2>发送到手机</h2><p>拖拽或选择文件，松开即发</p></div>
+              <button class="devicePill" id="devicePill">
+                <i class="dotSmall" id="deviceDot"></i>
+                <span id="deviceName">选择手机</span>
+                <svg class="ico"><use href="#i-chevron"></use></svg>
+              </button>
+            </div>
+            <div class="devicePicker" id="devicePicker"></div>
+            <div class="dropZone" id="dropZone">
+              <span class="dropGlow" aria-hidden="true"></span>
+              <span class="dropIcon"><svg class="ico"><use href="#i-upload"></use></svg></span>
+              <strong>把文件拖到这里</strong>
+              <span>支持多文件 · 直接写入手机「口袋文件」</span>
+              <button class="linkBtn" id="pickBtn2">或者选择文件</button>
+              <input type="file" id="fileInput" multiple hidden>
+            </div>
+            <div class="progressList" id="progressList"></div>
+          </article>
+
+          <article class="glass paneCard">
+            <div class="cardHead">
+              <div><h2>收到的文件</h2><p id="recvSub">手机发来的文件会在传输时实时出现</p></div>
+              <span class="badgeSoft" id="recvCount">0</span>
+            </div>
+            <div class="recvLive" id="recvLive"></div>
+            <div class="fileList" id="recvList"></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 剪贴板 -->
+      <section class="page" data-page="clipboard">
+        <div class="pageHead">
+          <div><span class="eyebrow">CLIPBOARD</span><h1>剪贴板</h1><p>手机和电脑各自保留最近记录，按文字去重。</p></div>
+          <div class="filterWrap" id="filterWrap">
+            <button class="filterMain" id="filterMain"><svg class="ico"><use href="#i-filter"></use></svg><span id="filterLabel">全部</span><span class="filterNum" id="filterNum">0</span></button>
+            <div class="filterOptions" id="filterOptions">
+              <button data-filter="all">全部</button>
+              <button data-filter="phone">手机</button>
+              <button data-filter="pc">电脑</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="clipActions">
+          <button class="actionBtn" id="clipSync"><svg class="ico"><use href="#i-sync"></use></svg>同步手机</button>
+          <button class="actionBtn" id="clipPush"><svg class="ico"><use href="#i-send"></use></svg>发到手机</button>
+          <button class="actionBtn danger" id="clipClear"><svg class="ico"><use href="#i-trash"></use></svg>清空电脑</button>
+        </div>
+
+        <div class="glass clipPanel"><div class="clipList" id="clipList"></div></div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 设备 -->
+      <section class="page" data-page="devices">
+        <div class="pageHead">
+          <div><span class="eyebrow">DEVICES</span><h1>设备</h1><p>UDP 自动发现，同一 Wi-Fi 即可互联。</p></div>
+          <div class="pageActions"><span class="pageBadge" id="deviceBadge">0 台</span><button class="ghostBtn" id="scanBtn"><svg class="ico"><use href="#i-refresh"></use></svg>重新扫描</button></div>
+        </div>
+        <div class="deviceGrid" id="deviceList"></div>
+        <div class="sectionLine"><span>本机服务</span></div>
+        <article class="glass serviceCard" id="serviceCard"></article>
+      </section>
+
+      <!-- ------------------------------------------------------------ 资源库 -->
+      <section class="page" data-page="library">
+        <div class="pageHead">
+          <div><span class="eyebrow">LIBRARY</span><h1>资源库</h1><p>小应用、HTML 收藏和手机安装包，都在这台电脑上管理。</p></div>
+          <div class="pageActions">
+            <button class="ghostBtn" id="libRefresh"><svg class="ico"><use href="#i-refresh"></use></svg>刷新</button>
+            <button class="primaryBtn" id="libUploadBtn"><svg class="ico"><use href="#i-upload"></use></svg>上传</button>
+            <input type="file" id="libFileInput" accept=".pkt,.html,.htm" multiple hidden>
+          </div>
+        </div>
+
+        <div class="miniNav" id="libNav">
+          <span class="miniPill" id="libPill"></span>
+          <button data-libtab="apps" class="active">小应用 <b id="appsCount">0</b></button>
+          <button data-libtab="html">HTML 收藏 <b id="htmlCount">0</b></button>
+          <button data-libtab="apk">手机安装包</button>
+        </div>
+
+        <div class="libPane active" data-libpane="apps">
+          <div class="libHint" id="libDrop"><svg class="ico"><use href="#i-upload"></use></svg><span>把 .pkt 或 HTML 拖到这里，自动生成手机应用</span></div>
+          <div class="appGrid" id="appGrid"></div>
+        </div>
+
+        <div class="libPane" data-libpane="html">
+          <div class="libListHead"><span>保存在 library 的 HTML</span><small>双击可在浏览器打开</small></div>
+          <div class="libList" id="htmlList"></div>
+        </div>
+
+        <div class="libPane" data-libpane="apk">
+          <article class="glass apkCard" id="apkCard"></article>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ 设置 -->
+      <section class="page" data-page="settings">
+        <div class="pageHead">
+          <div><span class="eyebrow">SETTINGS</span><h1>设置</h1><p>电脑端外观、启动、悬浮窗和本地服务。</p></div>
+        </div>
+
+        <div class="settingsGrid">
+          <article class="glass settingsCard">
+            <div class="cardHead"><div><h2>桌面与启动</h2><p>口袋在 Windows 上的行为</p></div></div>
+            <div class="settingRow">
+              <div><strong>深色模式</strong><small>关闭是浅蓝工作台，打开回到深色玻璃主题，切换时会柔和过渡</small></div>
+              <button class="toggle" id="themeToggle" role="switch" aria-checked="false"><i></i></button>
+            </div>
+            <div class="settingRow">
+              <div><strong>开机启动</strong><small>登录 Windows 后自动在右下角显示悬浮球</small></div>
+              <button class="toggle" id="autoLaunchToggle" role="switch" aria-checked="false"><i></i></button>
+            </div>
+            <div class="settingRow">
+              <div><strong>总在最前</strong><small>悬浮球、主窗口和悬浮窗保持在其他窗口上方</small></div>
+              <button class="toggle on" id="topToggle" role="switch" aria-checked="true"><i></i></button>
+            </div>
+            <div class="settingRow">
+              <div><strong>剪贴板自动记录</strong><small>在电脑上复制文字后自动写入历史</small></div>
+              <button class="toggle on" id="clipToggle" role="switch" aria-checked="true"><i></i></button>
+            </div>
+            <div class="settingRow">
+              <div><strong>剪贴板悬浮窗</strong><small>随时拖文件到手机，或直接取用手机剪贴板 · Ctrl+Shift+B</small></div>
+              <button class="linkBtn solid" id="floatSettingBtn">打开</button>
+            </div>
+          </article>
+
+          <article class="glass settingsCard">
+            <div class="cardHead"><div><h2>服务与版本</h2><p>本机 HTTP 服务与数据目录</p></div></div>
+            <div class="settingRow">
+              <div><strong>本地服务</strong><small id="serviceStateText">检测中…</small></div>
+              <button class="linkBtn solid" id="startService">启动</button>
+            </div>
+            <div class="settingRow">
+              <div><strong>服务端口</strong><small>手机通过这个端口访问电脑</small></div>
+              <span class="versionChip" id="portChip">8570</span>
+            </div>
+            <div class="settingRow">
+              <div><strong>数据目录</strong><small>资源库、收藏和收到的文件</small></div>
+              <button class="linkBtn" id="openDataDir">打开</button>
+            </div>
+            <div class="settingRow">
+              <div><strong>版本</strong><small id="versionText">Pocket Desktop</small></div>
+              <span class="versionChip" id="versionChip">1.0.0</span>
+            </div>
+          </article>
+        </div>
+
+        <button class="quitBtn" id="quitBtn"><svg class="ico"><use href="#i-close"></use></svg>退出口袋</button>
+      </section>
+    </main>
+  </div>
+
+  <div class="thumbs" id="thumbs">
+    <button class="thumb back" data-go="overview"><svg class="ico"><use href="#i-back"></use></svg><span>概览</span></button>
+    <button class="thumb" data-go="files"><svg class="ico"><use href="#i-folder"></use></svg><span>文件</span></button>
+    <button class="thumb" data-go="clipboard"><svg class="ico"><use href="#i-clipboard"></use></svg><span>剪贴板</span></button>
+    <button class="thumb" data-go="devices"><svg class="ico"><use href="#i-devices"></use></svg><span>设备</span></button>
+    <button class="thumb" data-go="library"><svg class="ico"><use href="#i-library"></use></svg><span>资源库</span></button>
+  </div>
+
+  <div class="dockWrap">
+    <div class="dock" id="dock">
+      <button data-page="overview" class="active"><svg class="ico"><use href="#i-grid"></use></svg><span class="tip">概览</span></button>
+      <button data-page="files"><svg class="ico"><use href="#i-folder"></use></svg><span class="tip">文件</span></button>
+      <button data-page="clipboard"><svg class="ico"><use href="#i-clipboard"></use></svg><span class="tip">剪贴板</span></button>
+      <button data-page="devices"><svg class="ico"><use href="#i-devices"></use></svg><span class="tip">设备</span></button>
+      <button data-page="library"><svg class="ico"><use href="#i-library"></use></svg><span class="tip">资源库</span></button>
+      <button data-page="settings"><svg class="ico"><use href="#i-settings"></use></svg><span class="tip">设置</span></button>
+    </div>
+  </div>
+</div>
+
+<div class="palette" id="palette">
+  <div class="paletteMask" id="paletteMask"></div>
+  <div class="palettePanel">
+    <div class="paletteSearch">
+      <svg class="ico"><use href="#i-search"></use></svg>
+      <input id="paletteInput" type="text" placeholder="搜索页面、设备、剪贴板、小应用…" autocomplete="off" spellcheck="false">
+      <span class="esc">ESC</span>
+    </div>
+    <div class="paletteList" id="paletteList"></div>
+    <div class="paletteFoot"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>Enter</kbd> 打开</span><span><kbd>Ctrl K</kbd> 关闭</span></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

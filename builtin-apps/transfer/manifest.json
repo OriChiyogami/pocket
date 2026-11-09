@@ -2,15 +2,15 @@
   "schema": "pocket.app/1",
   "id": "com.pocket.transfer",
   "name": "互传",
-  "version": "1.0.1",
+  "version": "1.2.0",
   "entry": "index.html",
   "description": "局域网内和电脑、手机高速互传文件，不经过网盘",
-  "accent": "#22B8CF",
+  "accent": "#141414",
   "display": {
     "orientation": "auto",
     "statusBar": "light",
     "fullscreen": false,
-    "background": "#FFF7F6FA"
+    "background": "#FFF5F5F2"
   },
   "permissions": []
 }

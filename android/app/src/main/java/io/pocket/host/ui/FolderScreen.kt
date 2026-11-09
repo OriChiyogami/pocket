@@ -201,7 +201,7 @@ private fun FolderAppCard(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    val accent = parseAccent(app.accent)
+    val accent = androidx.compose.ui.graphics.Color(0xFF141414)
     Column(
         modifier = Modifier
             .fillMaxWidth()

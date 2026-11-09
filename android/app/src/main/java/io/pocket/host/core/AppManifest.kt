@@ -67,7 +67,7 @@ data class AppManifest(
                 COLOR_PATTERN.matches(it)
             } ?: "#FFFFFFFF"
 
-            val accent = o.optString("accent", "").takeIf { COLOR_PATTERN.matches(it) } ?: "#7C5CFF"
+            val accent = o.optString("accent", "").takeIf { COLOR_PATTERN.matches(it) } ?: "#2F8BFF"
 
             val permissions = mutableSetOf<String>()
             o.optJSONArray("permissions")?.let { arr ->

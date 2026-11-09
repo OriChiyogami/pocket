@@ -121,7 +121,7 @@ class PackageInstaller(
         www.mkdirs()
         File(www, "index.html").writeText(html)
 
-        val accentPalette = listOf("#7C5CFF", "#FF6B9D", "#22B8CF", "#FF9F43", "#2ED573", "#A55EEA")
+        val accentPalette = listOf("#2F8BFF", "#6FD6FF", "#3FA7FF", "#165A9E", "#2ED573", "#8A5CFF")
         val accent = previous?.accent
             ?: accentPalette[(hash.hashCode() and Int.MAX_VALUE) % accentPalette.size]
 

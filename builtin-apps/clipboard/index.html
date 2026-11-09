@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>剪贴板</title>
+<style>
+  :root {
+    --bg: #04101f;
+    --text: #eaf6ff;
+    --sub: #8fb6d6;
+    --dim: #5f809b;
+    --blue: #2f8bff;
+    --cyan: #6fd6ff;
+    --stroke: rgba(151, 210, 255, .16);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(120% 70% at 8% -8%, rgba(47, 139, 255, .32), transparent 60%),
+      radial-gradient(90% 50% at 100% 4%, rgba(111, 214, 255, .14), transparent 62%),
+      linear-gradient(165deg, #071c33 0%, #04101f 58%, #030c17 100%);
+    background-attachment: fixed;
+    padding: calc(var(--pocket-safe-top, 0px) + 18px) 16px calc(var(--pocket-safe-bottom, 0px) + 30px);
+  }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  .brand { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .logo {
+    width: 42px; height: 42px; border-radius: 14px;
+    display: grid; place-items: center;
+    font-size: 22px; font-weight: 900; color: #fff;
+    background: linear-gradient(150deg, #6fd6ff, #2f8bff 55%, #165a9e);
+    box-shadow: 0 10px 24px rgba(47, 139, 255, .32), inset 0 1px 0 rgba(255, 255, 255, .35);
+    flex-shrink: 0;
+  }
+  .brand h1 { font-size: 24px; letter-spacing: -.5px; line-height: 1.15; }
+  .brand p { margin-top: 4px; font-size: 10.5px; color: var(--dim); display: flex; align-items: center; gap: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #5f809b; display: inline-block; }
+  .dot.on { background: #4fe3b0; box-shadow: 0 0 8px rgba(79, 227, 176, .85); }
+  .syncBtn {
+    height: 36px; padding: 0 13px; border-radius: 11px;
+    border: 1px solid rgba(111, 214, 255, .24);
+    background: rgba(47, 139, 255, .16); color: #c8edff;
+    font-size: 11.5px; font-weight: 700; white-space: nowrap;
+  }
+  .syncBtn:active { transform: scale(.97); }
+
+  .glass {
+    position: relative;
+    border-radius: 22px;
+    border: 1px solid var(--stroke);
+    background: linear-gradient(158deg, rgba(17, 45, 80, .72), rgba(6, 19, 36, .58));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 18px 36px rgba(0, 3, 10, .3);
+    backdrop-filter: blur(12px);
+  }
+
+  /* ---- 实时剪贴板 ---- */
+  .realtime { padding: 16px; margin-bottom: 12px; overflow: hidden; }
+  .realtime::after {
+    content: ""; position: absolute; width: 160px; height: 160px; right: -70px; top: -80px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(47, 139, 255, .35), transparent 68%);
+    pointer-events: none;
+  }
+  .rtTop { position: relative; z-index: 1; display: flex; align-items: center; gap: 11px; }
+  .rtIcon {
+    width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+    background: rgba(47, 139, 255, .16); border: 1px solid rgba(151, 210, 255, .18);
+    font-size: 17px; flex-shrink: 0;
+  }
+  .rtText { flex: 1; min-width: 0; }
+  .rtText strong { display: block; font-size: 15px; font-weight: 800; }
+  .rtText p { margin-top: 4px; font-size: 10.5px; color: var(--sub); }
+  .rtText p.on { color: #9fe9ff; }
+  .rtHint { position: relative; z-index: 1; margin-top: 11px; font-size: 10.5px; line-height: 1.55; color: var(--dim); }
+  .rtAuth {
+    position: relative; z-index: 1; display: none;
+    width: 100%; height: 36px; margin-top: 10px; border-radius: 11px;
+    border: 1px solid rgba(111, 214, 255, .24);
+    background: rgba(47, 139, 255, .18); color: #d9f3ff;
+    font-size: 11.5px; font-weight: 700;
+  }
+  .rtAuth.show { display: block; }
+  .rtAuth:active { transform: scale(.985); }
+
+  .switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+  .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .switch span {
+    position: absolute; inset: 0; border-radius: 99px;
+    background: rgba(151, 210, 255, .16);
+    border: 1px solid rgba(151, 210, 255, .12);
+    transition: background .25s, border-color .25s;
+  }
+  .switch span::after {
+    content: ""; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px;
+    border-radius: 50%; background: #cfe9ff;
+    transition: transform .28s cubic-bezier(.34,1.46,.64,1), background .25s;
+  }
+  .switch input:checked + span {
+    background: linear-gradient(120deg, #2f8bff, #6fd6ff);
+    border-color: rgba(111, 214, 255, .5);
+  }
+  .switch input:checked + span::after { transform: translateX(20px); background: #fff; }
+
+  /* ---- 当前剪贴板 ---- */
+  .nowCard { padding: 16px; margin-bottom: 12px; }
+  .cardHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .cardHead strong { font-size: 14px; font-weight: 700; }
+  .cardHead span { font-size: 10px; color: var(--dim); }
+  .preview {
+    margin-top: 11px; padding: 12px 13px; border-radius: 14px;
+    background: rgba(4, 15, 28, .5); border: 1px solid rgba(151, 210, 255, .08);
+    font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+    max-height: 126px; overflow: hidden; color: rgba(234, 246, 255, .92);
+  }
+  .preview.empty { color: var(--dim); font-style: italic; }
+  .actions { display: flex; gap: 9px; margin-top: 12px; }
+  .primary {
+    flex: 1; height: 42px; border-radius: 13px; border: none;
+    font-size: 12.5px; font-weight: 800; color: #05203c;
+    background: linear-gradient(120deg, #6fd6ff, #2f8bff);
+    box-shadow: 0 10px 22px rgba(47, 139, 255, .28), inset 0 1px 0 rgba(255, 255, 255, .35);
+  }
+  .primary:active { transform: scale(.985); }
+  .ghost {
+    height: 42px; padding: 0 14px; border-radius: 12px;
+    border: 1px solid rgba(151, 210, 255, .14);
+    background: rgba(255, 255, 255, .04); color: var(--sub);
+    font-size: 11.5px; font-weight: 700;
+  }
+  .ghost:active { transform: scale(.985); }
+
+  .section {
+    display: flex; align-items: center; gap: 8px;
+    margin: 18px 4px 10px; font-size: 10px; font-weight: 700;
+    letter-spacing: 1.2px; color: var(--dim); text-transform: uppercase;
+  }
+  .section .count { background: rgba(47, 139, 255, .18); color: #9fe9ff; padding: 2px 8px; border-radius: 99px; letter-spacing: 0; font-size: 10px; }
+  .section .hint { margin-left: auto; font-size: 9.5px; font-weight: 500; letter-spacing: 0; color: var(--dim); }
+
+  .item {
+    padding: 13px 14px; margin-bottom: 9px; border-radius: 17px;
+    border: 1px solid rgba(151, 210, 255, .12);
+    background: linear-gradient(158deg, rgba(14, 40, 70, .62), rgba(5, 18, 34, .5));
+    transition: transform .1s ease, border-color .2s;
+  }
+  .item:active { transform: scale(.99); border-color: rgba(111, 214, 255, .35); }
+  .itemText {
+    font-size: 12.5px; line-height: 1.6; white-space: pre-wrap; word-break: break-word;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .itemMeta { display: flex; align-items: center; gap: 7px; margin-top: 9px; font-size: 9.5px; color: var(--dim); flex-wrap: wrap; }
+  .badge { padding: 2px 7px; border-radius: 99px; font-size: 8.5px; font-weight: 700; }
+  .badge.phone { background: rgba(111, 214, 255, .14); color: #9fe9ff; }
+  .badge.pc { background: rgba(47, 139, 255, .16); color: #a9c8ff; }
+  .itemMeta .len { margin-left: auto; }
+  .itemBtn {
+    height: 25px; padding: 0 9px; border-radius: 8px; border: 1px solid rgba(151, 210, 255, .14);
+    background: rgba(47, 139, 255, .14); color: #c8edff; font-size: 10px; font-weight: 700;
+  }
+  .itemBtn.danger { background: rgba(255, 92, 108, .1); border-color: rgba(255, 92, 108, .18); color: #ffb3bb; }
+
+  .empty {
+    border: 1px dashed rgba(111, 214, 255, .28);
+    background: rgba(47, 139, 255, .05);
+    border-radius: 18px; padding: 30px 18px; text-align: center; color: var(--sub);
+  }
+  .empty .icon { font-size: 26px; margin-bottom: 8px; }
+  .empty p { font-size: 10.5px; margin-top: 6px; line-height: 1.65; color: var(--dim); }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(var(--pocket-safe-bottom, 0px) + 30px);
+    transform: translateX(-50%) translateY(12px);
+    background: rgba(6, 22, 40, .96); color: #eaf6ff; font-size: 11.5px;
+    padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(151, 210, 255, .2);
+    box-shadow: 0 14px 30px rgba(0, 3, 10, .5);
+    opacity: 0; pointer-events: none; transition: all .22s ease; max-width: 82vw; text-align: center; z-index: 30;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---- 黑 / 白 / 灰极简皮肤 ---- */
+  :root { --text:#141414; --sub:#6b6b6b; --dim:#9a9a96; --blue:#141414; --cyan:#6b6b6b; --stroke:#e4e4df; }
+  body { background:#f3f5f8; color:#141414; }
+  .logo { background:linear-gradient(150deg,#8B7CF6,#6C63E8); color:#fff; box-shadow:none; }
+  .syncBtn { background:#141414; color:#fff; border-color:#141414; }
+  .glass { background:#fff; border-color:#e4e4df; box-shadow:0 12px 30px rgba(0,0,0,.06); }
+  .realtime { background:#141414; border-color:#141414; }
+  .realtime::after { display:none; }
+  .rtIcon { background:#262626; border-color:#383838; color:#fff; }
+  .rtText strong { color:#fff; }
+  .rtText p, .rtText p.on { color:#bcbcb6; }
+  .rtHint { color:#9a9a96; }
+  .rtAuth { background:#fff; color:#141414; border-color:#fff; }
+  .switch span { background:#3a3a3a; border-color:#4a4a4a; }
+  .switch span::after { background:#fff; }
+  .switch input:checked + span { background:#fff; border-color:#fff; }
+  .switch input:checked + span::after { background:#141414; }
+  .nowCard { background:#fff; }
+  .cardHead strong { color:#141414; }
+  .cardHead span { color:#9a9a96; }
+  .preview { background:#f4f4f1; border-color:#e9e9e4; color:#141414; }
+  .preview.empty { color:#9a9a96; }
+  .primary { background:#141414; color:#fff; box-shadow:none; }
+  .ghost { background:#fff; color:#141414; border-color:#e4e4df; }
+  .section { color:#9a9a96; }
+  .section .count { background:#141414; color:#fff; }
+  .item { background:#fff; border-color:#e4e4df; }
+  .itemText { color:#141414; }
+  .itemMeta { color:#9a9a96; }
+  .badge.phone, .badge.pc { background:#efefec; color:#555; }
+  .itemBtn { background:#141414; color:#fff; border-color:#141414; }
+  .itemBtn.danger { background:#f3e6e5; color:#b3261e; border-color:#ead5d3; }
+  .empty { border-color:#cfcfc9; background:#fff; color:#6b6b6b; }
+  .empty p { color:#9a9a96; }
+  .toast { background:#141414; color:#fff; border-color:#141414; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class="logo">P</span>
+    <div>
+      <h1>剪贴板</h1>
+      <p><span class="dot" id="dot"></span><span id="devName">手机 ↔ 电脑</span> · 实时同步</p>
+    </div>
+  </div>
+  <button class="syncBtn" id="sync">同步电脑</button>
+</header>
+
+<section class="glass realtime">
+  <div class="rtTop">
+    <span class="rtIcon">⚡</span>
+    <div class="rtText">
+      <strong>实时剪贴板</strong>
+      <p id="rtStatus">关闭中</p>
+    </div>
+    <label class="switch"><input type="checkbox" id="rtToggle"><span></span></label>
+  </div>
+  <div class="rtHint" id="rtHint">开启后，手机上复制的文字会自动出现在电脑端，不用停在口袋页面。</div>
+  <button class="rtAuth" id="rtAuth">去开启无障碍权限</button>
+</section>
+
+<section class="glass nowCard">
+  <div class="cardHead"><strong>最近一次复制</strong><span id="nowHint">打开时自动记录一次</span></div>
+  <div class="preview empty" id="nowText">（还没有读取）</div>
+  <div class="actions">
+    <button class="primary" id="capture">记录当前剪贴板</button>
+    <button class="ghost" id="clear">清空历史</button>
+  </div>
+</section>
+
+<div class="section">历史 <span class="count" id="count">0</span><span class="hint">点条目复制</span></div>
+<div id="list"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  var items = [];
+  var lastCaptured = '';
+  var syncing = false;
+  var realtime = { enabled: false, accessibility: false, overlay: false, connected: false };
+
+  function esc(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  var toastTimer = null;
+  function toast(text) {
+    if (!text) return;
+    var box = document.getElementById('toast');
+    box.textContent = text;
+    box.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { box.classList.remove('show'); }, 1800);
+  }
+
+  function fmtTime(ms) {
+    var diff = Date.now() - (ms || 0);
+    if (diff < 60000) return '刚刚';
+    if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+    var d = new Date(ms || 0);
+    var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return (d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function renderNow(text) {
+    var box = document.getElementById('nowText');
+    if (text) {
+      box.textContent = text;
+      box.classList.remove('empty');
+    } else {
+      box.textContent = '（剪贴板为空）';
+      box.classList.add('empty');
+    }
+  }
+
+  function renderRealtime() {
+    var toggle = document.getElementById('rtToggle');
+    var status = document.getElementById('rtStatus');
+    var hint = document.getElementById('rtHint');
+    var auth = document.getElementById('rtAuth');
+    toggle.checked = !!realtime.enabled;
+    auth.classList.toggle('show', !!realtime.enabled && (!realtime.accessibility || !realtime.overlay));
+
+    if (!realtime.enabled) {
+      status.textContent = '关闭中';
+      status.className = '';
+      hint.textContent = '开启后，手机上复制的文字会自动出现在电脑端，不用停在口袋页面。';
+      return;
+    }
+    if (!realtime.accessibility) {
+      status.textContent = '等待无障碍权限';
+      status.className = '';
+      hint.textContent = '需要在系统设置里开启「口袋剪贴板」无障碍服务：它只用来识别你按下了「复制」，不会读取屏幕内容。';
+      auth.textContent = '去开启无障碍权限';
+      return;
+    }
+    if (!realtime.connected) {
+      status.textContent = '已授权，等待服务启动';
+      status.className = 'on';
+      hint.textContent = '系统已授权。如果一直不生效，请把口袋从最近任务里划掉再打开一次。';
+      return;
+    }
+    if (!realtime.overlay) {
+      status.textContent = '实时监听中（建议再开悬浮窗）';
+      status.className = 'on';
+      hint.textContent = '分屏时另一个应用占着焦点，口袋需要临时抢一下焦点才能读到剪贴板；允许「显示在其他应用上层」成功率更高。';
+      auth.textContent = '开启悬浮窗权限（可选）';
+      return;
+    }
+    status.textContent = '实时监听中 · 电脑端会自动出现';
+    status.className = 'on';
+    hint.textContent = '现在复制文字（微信、浏览器、备忘录都行），电脑端剪贴板会在 1~2 秒内同步。';
+  }
+
+  async function refreshRealtime() {
+    try {
+      var st = await pocket.clipboard.realtime();
+      realtime = st || realtime;
+    } catch (e) {}
+    renderRealtime();
+  }
+
+  function renderList() {
+    var box = document.getElementById('list');
+    document.getElementById('count').textContent = items.length;
+    if (!items.length) {
+      box.innerHTML = '<div class="empty"><div class="icon">⌁</div><strong>还没有剪贴板记录</strong>' +
+        '<p>开启上面的「实时剪贴板」后，在其它应用里复制文字，这里和电脑端都会自动出现。</p></div>';
+      return;
+    }
+    box.innerHTML = items.map(function (item) {
+      var source = item.source === 'pc' ? '电脑' : '手机';
+      var cls = item.source === 'pc' ? 'pc' : 'phone';
+      var text = String(item.text || '');
+      var preview = text.length > 1200 ? text.slice(0, 1200) + '…' : text;
+      return '<div class="item" data-id="' + esc(item.id) + '">' +
+        '<div class="itemText">' + esc(preview) + '</div>' +
+        '<div class="itemMeta">' +
+          '<span class="badge ' + cls + '">' + source + '</span>' +
+          '<span>' + fmtTime(item.time) + '</span>' +
+          '<span class="len">' + text.length + ' 字</span>' +
+          '<button class="itemBtn" data-copy="' + esc(item.id) + '">复制</button>' +
+          '<button class="itemBtn danger" data-rm="' + esc(item.id) + '">删除</button>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  async function refresh() {
+    try {
+      items = await pocket.clipboard.history();
+      renderList();
+    } catch (e) {
+      toast(e.message || '读取历史失败');
+    }
+  }
+
+  async function readCopied() {
+    try {
+      var text = await pocket.clipboard.read();
+      renderNow(text || '');
+      return text || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  async function capture(silent) {
+    var text = await readCopied();
+    if (!text || !text.trim()) {
+      if (!silent) toast('剪贴板里没有文字');
+      return;
+    }
+    if (text === lastCaptured) {
+      if (!silent) toast('这条已经在历史里了');
+      return;
+    }
+    try {
+      await pocket.clipboard.add(text, 'phone');
+      lastCaptured = text;
+      await refresh();
+      if (!silent) toast('已记录到历史');
+    } catch (e) {
+      if (!silent) toast(e.message || '记录失败');
+    }
+  }
+
+  async function sync() {
+    if (syncing) return;
+    syncing = true;
+    document.getElementById('sync').disabled = true;
+    try {
+      var result = await pocket.clipboard.sync();
+      await refresh();
+      var added = (result && result.added) || 0;
+      toast('已同步' + (added > 0 ? '，新增 ' + added + ' 条' : '，没有新内容') +
+        (result && result.peer ? '（' + result.peer + '）' : ''));
+    } catch (e) {
+      toast(e.message || '同步失败');
+    }
+    syncing = false;
+    document.getElementById('sync').disabled = false;
+  }
+
+  async function copyItem(id) {
+    try {
+      var entry = await pocket.clipboard.copy(id);
+      lastCaptured = (entry && entry.text) || '';
+      renderNow(lastCaptured);
+      pocket.ui.haptic('success');
+      toast('已复制到剪贴板');
+    } catch (e) {
+      toast(e.message || '复制失败');
+    }
+  }
+
+  async function removeItem(id) {
+    try {
+      await pocket.clipboard.remove(id);
+      await refresh();
+      toast('已删除');
+    } catch (e) {
+      toast(e.message || '删除失败');
+    }
+  }
+
+  async function clearAll() {
+    if (!items.length) return;
+    var ok = await pocket.ui.confirm('清空剪贴板历史？', '只会清空这台手机上的记录，电脑端不受影响。');
+    if (!ok) return;
+    try {
+      await pocket.clipboard.clear();
+      lastCaptured = '';
+      await refresh();
+      toast('已清空');
+    } catch (e) {
+      toast(e.message || '清空失败');
+    }
+  }
+
+  async function toggleRealtime(enabled) {
+    try {
+      var st = await pocket.clipboard.setRealtime(enabled);
+      realtime = st || realtime;
+      renderRealtime();
+      if (enabled && !realtime.accessibility) {
+        toast('请在系统设置里开启「口袋剪贴板」无障碍服务');
+      } else if (enabled) {
+        toast('实时剪贴板已开启');
+      } else {
+        toast('已关闭实时剪贴板');
+      }
+    } catch (e) {
+      document.getElementById('rtToggle').checked = !enabled;
+      toast(e.message || '设置失败');
+    }
+  }
+
+  document.getElementById('list').addEventListener('click', function (e) {
+    var target = e.target;
+    var rm = target.closest ? target.closest('[data-rm]') : null;
+    if (rm) {
+      removeItem(rm.getAttribute('data-rm'));
+      return;
+    }
+    var cp = target.closest ? target.closest('[data-copy]') : null;
+    if (cp) {
+      copyItem(cp.getAttribute('data-copy'));
+      return;
+    }
+    var item = target.closest ? target.closest('[data-id]') : null;
+    if (item) copyItem(item.getAttribute('data-id'));
+  });
+
+  document.getElementById('sync').addEventListener('click', sync);
+  document.getElementById('capture').addEventListener('click', function () { capture(false); });
+  document.getElementById('clear').addEventListener('click', clearAll);
+  document.getElementById('rtToggle').addEventListener('change', function (e) {
+    toggleRealtime(!!e.target.checked);
+  });
+  document.getElementById('rtAuth').addEventListener('click', function () {
+    pocket.clipboard.openRealtimeSettings();
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      refreshRealtime();
+      capture(true);
+      refresh();
+    }
+  });
+
+  pocket.on('clipboard.changed', function () { refresh(); });
+  pocket.ui.keepScreenOn(true);
+
+  (async function init() {
+    try {
+      var st = await pocket.transfer.status();
+      document.getElementById('devName').textContent = st.deviceName || '手机 ↔ 电脑';
+      document.getElementById('dot').className = st.running ? 'dot on' : 'dot';
+    } catch (e) {}
+    await refreshRealtime();
+    await refresh();
+    await capture(true);
+    pocket.clipboard.sync().then(function () { refresh(); }).catch(function () {});
+    setInterval(refresh, 4000);
+    setInterval(refreshRealtime, 3000);
+    setInterval(function () {
+      if (!syncing) pocket.clipboard.sync().then(function () { refresh(); }).catch(function () {});
+    }, 20000);
+  })();
+})();
+</script>
+</body>
+</html>

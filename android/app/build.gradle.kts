@@ -13,6 +13,13 @@ val imageSecrets = Properties().apply {
 }
 val imageApiKey = imageSecrets.getProperty("image.apiKey", "").trim()
 
+// 签名文件与密码不进仓库：放在 android/keystore.properties（已 .gitignore）
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val hasKeystore = keystoreProps.isNotEmpty()
+
 android {
     namespace = "io.pocket.host"
     compileSdk = 34
@@ -21,25 +28,27 @@ android {
         applicationId = "io.pocket.host"
         minSdk = 24
         targetSdk = 34
-        versionCode = 18
-        versionName = "1.3.6"
+        versionCode = 27
+        versionName = "1.10.2"
 
         buildConfigField("String", "IMAGE_API_KEY", "\"$imageApiKey\"")
     }
 
     signingConfigs {
-        create("release") {
-            storeFile = file("../pocket-release.jks")
-            storePassword = "pocket2024"
-            keyAlias = "pocket"
-            keyPassword = "pocket2024"
+        if (hasKeystore) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile", "pocket-release.jks"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            if (hasKeystore) signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {

@@ -2,7 +2,9 @@ package io.pocket.host
 
 import android.app.Application
 import android.content.Context
+import io.pocket.host.core.ClipboardMonitor
 import io.pocket.host.core.PackageInstaller
+import io.pocket.host.core.PocketKeepAliveService
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.core.TransferRuntime
 
@@ -20,6 +22,10 @@ class PocketApp : Application() {
         installer = PackageInstaller(this, repository)
         // 局域网互传：HTTP 服务 + UDP 发现，随进程启动
         runCatching { TransferRuntime.start(this) }
+        // 开了实时剪贴板就把前台保活服务拉起来，退到后台也不会断联
+        if (ClipboardMonitor.isEnabled(this)) {
+            PocketKeepAliveService.start(this)
+        }
     }
 
     companion object {

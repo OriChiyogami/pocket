@@ -8,72 +8,98 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   body {
     font-family: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
-    background: #F7F6FA; color: #14121C; min-height: 100vh;
+    color: #eaf6ff; min-height: 100vh;
+    background:
+      radial-gradient(120% 70% at 8% -8%, rgba(47, 139, 255, .32), transparent 60%),
+      radial-gradient(90% 50% at 100% 4%, rgba(111, 214, 255, .14), transparent 62%),
+      linear-gradient(165deg, #071c33 0%, #04101f 58%, #030c17 100%);
+    background-attachment: fixed;
     padding: calc(var(--pocket-safe-top, 0px) + 18px) 16px calc(var(--pocket-safe-bottom, 0px) + 28px);
   }
-  @media (prefers-color-scheme: dark) {
-    body { background: #0C0B10; color: #F2F0F7; }
-    .card, .item, .tab, .search { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.09); }
-    .meta, .hint { color: #9C97B0; }
-  }
   header { margin-bottom: 14px; }
-  h1 { font-size: 28px; letter-spacing: -.6px; }
-  h1 em { font-style: normal; background: linear-gradient(120deg,#7C5CFF,#22B8CF); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .hint { font-size: 11.5px; color: #8E89A3; margin-top: 5px; line-height: 1.55; }
+  h1 { font-size: 25px; letter-spacing: -.5px; }
+  h1 em { font-style: normal; background: linear-gradient(120deg,#6fd6ff,#2f8bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hint { font-size: 10.5px; color: #5f809b; margin-top: 5px; line-height: 1.6; }
 
   .tabs { display: flex; gap: 8px; margin: 16px 0 12px; }
   .tab {
-    border: 1px solid rgba(0,0,0,.05); background: rgba(255,255,255,.85); color: #6B6780;
-    border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 12.5px; font-weight: 600;
+    border: 1px solid rgba(151,210,255,.14); background: rgba(7, 24, 44, .5); color: #8fb6d6;
+    border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 11.5px; font-weight: 600;
   }
-  .tab.on { background: #7C5CFF; border-color: #7C5CFF; color: #fff; }
+  .tab.on { background: linear-gradient(120deg,#2f8bff,#6fd6ff); border-color: rgba(111,214,255,.4); color: #05203c; }
 
   .search {
-    width: 100%; border: 1px solid rgba(0,0,0,.06); background: rgba(255,255,255,.85);
-    border-radius: 14px; padding: 11px 14px; font: inherit; font-size: 13px; color: inherit; outline: none;
+    width: 100%; border: 1px solid rgba(151,210,255,.14); background: rgba(7, 24, 44, .5);
+    border-radius: 14px; padding: 11px 14px; font: inherit; font-size: 12.5px; color: #eaf6ff; outline: none;
   }
-  .search::placeholder { color: #A8A3B8; }
+  .search::placeholder { color: #5f809b; }
 
   .list { margin-top: 12px; }
   .item {
     display: flex; align-items: center; gap: 12px; padding: 11px 12px; margin-bottom: 8px;
-    background: rgba(255,255,255,.86); border: 1px solid rgba(0,0,0,.05); border-radius: 16px;
+    background: linear-gradient(158deg, rgba(14, 40, 70, .66), rgba(5, 18, 34, .52));
+    border: 1px solid rgba(151,210,255,.12); border-radius: 16px;
   }
   .thumb, .ext {
     width: 44px; height: 44px; border-radius: 12px; flex: none;
-    background: linear-gradient(135deg, rgba(124,92,255,.16), rgba(34,184,207,.16));
-    display: grid; place-items: center; font-size: 11px; font-weight: 800; color: #5B43C9; overflow: hidden;
+    background: linear-gradient(135deg, rgba(47,139,255,.24), rgba(111,214,255,.1));
+    border: 1px solid rgba(151,210,255,.14);
+    display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #9fe9ff; overflow: hidden;
   }
   .thumb img { width: 100%; height: 100%; object-fit: cover; }
   .meta { flex: 1; min-width: 0; }
-  .meta strong { display: block; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .meta span { display: block; font-size: 11px; color: #8E89A3; margin-top: 3px; }
-  .more { border: none; background: rgba(0,0,0,.05); color: #6B6780; width: 32px; height: 32px; border-radius: 50%; font-size: 16px; line-height: 1; }
+  .meta strong { display: block; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta span { display: block; font-size: 10px; color: #5f809b; margin-top: 4px; }
+  .more { border: 1px solid rgba(151,210,255,.12); background: rgba(255,255,255,.04); color: #8fb6d6; width: 32px; height: 32px; border-radius: 50%; font-size: 16px; line-height: 1; }
 
   .empty {
-    border: 1px dashed rgba(124,92,255,.35); background: rgba(124,92,255,.05);
+    border: 1px dashed rgba(111,214,255,.28); background: rgba(47,139,255,.05);
     border-radius: 18px; padding: 30px 18px; text-align: center;
   }
   .empty .icon { font-size: 28px; margin-bottom: 8px; }
-  .empty p { font-size: 11.5px; color: #8E89A3; margin-top: 6px; line-height: 1.6; }
+  .empty p { font-size: 10.5px; color: #5f809b; margin-top: 6px; line-height: 1.6; }
 
   .sheet {
-    position: fixed; inset: 0; z-index: 30; background: rgba(12,11,16,.55);
+    position: fixed; inset: 0; z-index: 30; background: rgba(2, 8, 18, .6);
+    backdrop-filter: blur(4px);
     display: none; align-items: flex-end;
   }
   .sheet.show { display: flex; }
   .sheetBody {
-    width: 100%; max-height: 88vh; overflow: auto; background: #fff; color: #14121C;
+    width: 100%; max-height: 88vh; overflow: auto;
+    background: linear-gradient(165deg, #0a2c4e, #04101f 70%);
+    color: #eaf6ff;
+    border: 1px solid rgba(151,210,255,.16);
     border-radius: 24px 24px 0 0; padding: 16px 16px calc(var(--pocket-safe-bottom, 0px) + 18px);
   }
   .sheetHead { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-  .sheetHead strong { flex: 1; font-size: 14px; word-break: break-all; }
-  .sheetHead button { border: none; background: rgba(0,0,0,.06); border-radius: 50%; width: 32px; height: 32px; font-size: 16px; }
+  .sheetHead strong { flex: 1; font-size: 13px; word-break: break-all; }
+  .sheetHead button { border: 1px solid rgba(151,210,255,.14); background: rgba(255,255,255,.04); color: #8fb6d6; border-radius: 50%; width: 32px; height: 32px; font-size: 16px; }
   .preview img, .preview video { width: 100%; max-height: 62vh; object-fit: contain; border-radius: 14px; background: #000; }
   .preview audio { width: 100%; margin-top: 10px; }
-  .preview pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; line-height: 1.65; max-height: 56vh; overflow: auto; }
-  .noPreview { text-align: center; color: #6B6780; padding: 30px 0; font-size: 13px; }
-  .noPreview button { margin-top: 14px; border: none; background: #7C5CFF; color: #fff; border-radius: 12px; padding: 10px 16px; font: inherit; }
+  .preview pre { white-space: pre-wrap; word-break: break-word; font-size: 11.5px; line-height: 1.65; max-height: 56vh; overflow: auto; color: #c8edff; }
+  .noPreview { text-align: center; color: #8fb6d6; padding: 30px 0; font-size: 12px; }
+  .noPreview button { margin-top: 14px; border: none; background: linear-gradient(120deg,#6fd6ff,#2f8bff); color: #05203c; border-radius: 12px; padding: 10px 16px; font: inherit; font-weight: 700; }
+
+  /* ---- 黑 / 白 / 灰极简皮肤 ---- */
+  body { background:#f3f5f8; color:#141414; }
+  h1 em { background:linear-gradient(120deg,#52D6BE,#22B58F); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }
+  .hint, .meta span, .empty p { color:#9a9a96; }
+  .tab { background:#fff; border-color:#e4e4df; color:#6b6b6b; }
+  .tab.on { background:#141414; border-color:#141414; color:#fff; }
+  .search { background:#fff; border-color:#e4e4df; color:#141414; }
+  .search::placeholder { color:#9a9a96; }
+  .item { background:#fff; border-color:#e4e4df; }
+  .thumb, .ext { background:#141414; border-color:#141414; color:#fff; }
+  .meta strong { color:#141414; }
+  .more { background:#efefec; border-color:#e4e4df; color:#141414; }
+  .empty { border-color:#cfcfc9; background:#fff; }
+  .sheet { background:rgba(0,0,0,.35); }
+  .sheetBody { background:#fff; color:#141414; border-color:#e4e4df; }
+  .sheetHead button { background:#efefec; border-color:#e4e4df; color:#141414; }
+  .preview pre { color:#141414; }
+  .noPreview { color:#6b6b6b; }
+  .noPreview button { background:#141414; color:#fff; }
 </style>
 </head>
 <body>

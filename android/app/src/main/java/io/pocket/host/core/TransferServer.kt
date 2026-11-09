@@ -137,6 +137,48 @@ object TransferServer {
         if (method == "OPTIONS") return sendEmpty(output, 204)
 
         when {
+            // ---------------------------------------------------------- 剪贴板
+            path == "/api/clipboard" && method == "GET" -> {
+                val array = JSONArray()
+                ClipboardStore.list(context).forEach { array.put(it.toJson()) }
+                sendJson(output, 200, JSONObject().put("ok", true).put("items", array))
+            }
+
+            path == "/api/clipboard" && method == "POST" -> {
+                val body = readBody(input, headers, MAX_JSON_BODY)
+                val json = runCatching { JSONObject(String(body, Charsets.UTF_8)) }.getOrNull()
+                if (json == null) {
+                    return sendJson(output, 400, JSONObject().put("error", "请求格式错误"))
+                }
+                val text = json.optString("text")
+                if (text.isBlank()) {
+                    return sendJson(output, 400, JSONObject().put("error", "text 不能为空"))
+                }
+                val entry = ClipboardStore.add(
+                    context = context,
+                    text = text,
+                    source = json.optString("source", "pc"),
+                    time = json.optLong("time", 0L)
+                ) ?: return sendJson(output, 400, JSONObject().put("error", "保存失败"))
+                sendJson(output, 200, JSONObject().put("ok", true).put("item", entry.toJson()))
+                TransferEvents.emit("clipboard.changed", entry.toJson())
+            }
+
+            path == "/api/clipboard/clear" && method == "POST" -> {
+                ClipboardStore.clear(context)
+                sendJson(output, 200, JSONObject().put("ok", true))
+                TransferEvents.emit("clipboard.changed", JSONObject().put("cleared", true))
+            }
+
+            path.startsWith("/api/clipboard/") && method == "DELETE" -> {
+                val id = path.removePrefix("/api/clipboard/")
+                val ok = id.isNotBlank() && ClipboardStore.remove(context, id)
+                sendJson(output, if (ok) 200 else 404, JSONObject().put("ok", ok))
+                if (ok) {
+                    TransferEvents.emit("clipboard.changed", JSONObject().put("removed", id))
+                }
+            }
+
             (path == "/api/transfer/info" || path == "/api/transfer/ping" || path == "/") &&
                 method == "GET" -> {
                 val json = TransferDiscovery.infoJson()

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,6 +38,7 @@ import io.pocket.host.core.formatBytes
 fun SettingsScreen(
     apps: List<InstalledApp>,
     onBack: () -> Unit,
+    showBack: Boolean = true,
     onRestoreExamples: () -> Unit,
     onCheckUpdate: () -> Unit,
     onOpenAi: () -> Unit,
@@ -61,12 +63,16 @@ fun SettingsScreen(
                 .padding(top = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(
-                    Icons.Filled.ArrowBack,
-                    contentDescription = "返回",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            if (showBack) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Filled.ArrowBack,
+                        contentDescription = "返回",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                Spacer(Modifier.width(8.dp))
             }
             Text(
                 text = "设置",

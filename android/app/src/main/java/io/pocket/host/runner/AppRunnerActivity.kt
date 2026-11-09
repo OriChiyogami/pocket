@@ -35,6 +35,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import io.pocket.host.PocketApp
+import io.pocket.host.R
 import io.pocket.host.core.InstalledApp
 import io.pocket.host.ui.theme.PocketTheme
 import kotlinx.coroutines.Dispatchers
@@ -559,6 +560,11 @@ class AppRunnerActivity : ComponentActivity(), RunnerHost {
                 JSONObject.quote(name) + ", " + JSONObject.quote(payload.toString()) + ")"
             webView.evaluateJavascript(script, null)
         }
+    }
+
+    override fun finish() {
+        super.finish()
+        overridePendingTransition(R.anim.pocket_home_in, R.anim.pocket_exit)
     }
 
     override fun closeApp() {

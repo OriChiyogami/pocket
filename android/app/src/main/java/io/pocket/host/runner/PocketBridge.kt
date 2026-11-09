@@ -26,11 +26,15 @@ import androidx.core.app.NotificationCompat
 import io.pocket.host.R
 import io.pocket.host.core.AiConfig
 import io.pocket.host.core.BridgeException
+import io.pocket.host.core.ClipboardEntry
+import io.pocket.host.core.ClipboardMonitor
+import io.pocket.host.core.ClipboardStore
 import io.pocket.host.core.ImageConfig
 import io.pocket.host.core.InstalledApp
 import io.pocket.host.core.PackageRepository
 import io.pocket.host.core.PocketStorage
 import io.pocket.host.core.TransferClient
+import io.pocket.host.core.TransferDiscovery
 import io.pocket.host.core.TransferEvents
 import io.pocket.host.core.TransferRuntime
 import io.pocket.host.core.TransferStore
@@ -170,6 +174,71 @@ class PocketBridge(
 
             "transfer.devices" -> TransferRuntime.devicesJson()
 
+            "clipboard.realtime" -> {
+                requirePermission("clipboard")
+                ClipboardMonitor.status(hostContext())
+            }
+
+            "clipboard.setRealtime" -> {
+                requirePermission("clipboard")
+                val enabled = params.optBoolean("enabled", false)
+                val context = hostContext()
+                ClipboardMonitor.setEnabled(context, enabled)
+                if (enabled && !ClipboardMonitor.isAccessibilityEnabled(context)) {
+                    // 无障碍是识别「复制」动作的前提，必须先开
+                    ClipboardMonitor.openAccessibilitySettings(context)
+                }
+                ClipboardMonitor.status(context)
+            }
+
+            "clipboard.openSettings" -> {
+                requirePermission("clipboard")
+                val context = hostContext()
+                if (!ClipboardMonitor.isAccessibilityEnabled(context)) {
+                    ClipboardMonitor.openAccessibilitySettings(context)
+                } else {
+                    ClipboardMonitor.openOverlaySettings(context)
+                }
+                true
+            }
+
+            "clipboard.history" -> {
+                requirePermission("clipboard")
+                val array = JSONArray()
+                ClipboardStore.list(hostContext()).forEach { array.put(it.toJson()) }
+                array
+            }
+
+            "clipboard.add" -> {
+                requirePermission("clipboard")
+                val text = params.optString("text")
+                if (text.isBlank()) throw BridgeException("E_INVALID_ARG", "text 不能为空")
+                val entry = ClipboardStore.add(
+                    hostContext(), text, params.optString("source", "phone")
+                ) ?: throw BridgeException("E_IO", "保存剪贴板失败")
+                TransferEvents.emit("clipboard.changed", entry.toJson())
+                entry.toJson()
+            }
+
+            "clipboard.remove" -> {
+                requirePermission("clipboard")
+                val ok = ClipboardStore.remove(hostContext(), params.requireString("id"))
+                if (ok) {
+                    TransferEvents.emit(
+                        "clipboard.changed",
+                        JSONObject().put("removed", params.optString("id"))
+                    )
+                }
+                JSONObject().put("ok", ok)
+            }
+
+            "clipboard.clear" -> {
+                requirePermission("clipboard")
+                ClipboardStore.clear(hostContext())
+                TransferEvents.emit("clipboard.changed", JSONObject().put("cleared", true))
+                true
+            }
+
             "files.list" -> {
                 val direction = params.optString("direction", "")
                 val array = JSONArray()
@@ -271,6 +340,59 @@ class PocketBridge(
                     val clip = clipboard.primaryClip
                     val text = if (clip != null && clip.itemCount > 0) clip.getItemAt(0).coerceToText(hostContext()).toString() else ""
                     resolve(id, true, text, null)
+                }
+
+                "clipboard.copy" -> {
+                    requirePermission("clipboard")
+                    val target = ClipboardStore.list(hostContext())
+                        .firstOrNull { it.id == params.optString("id") }
+                    if (target == null) {
+                        resolve(id, false, null, BridgeException("E_NOT_FOUND", "记录不存在"))
+                    } else {
+                        val clipboard = hostContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("pocket", target.text))
+                        resolve(id, true, target.toJson(), null)
+                    }
+                }
+
+                "clipboard.realtime" -> {
+                    requirePermission("clipboard")
+                    ClipboardMonitor.status(hostContext())
+                }
+
+                "clipboard.setRealtime" -> {
+                    requirePermission("clipboard")
+                    val enabled = params.optBoolean("enabled", false)
+                    val context = hostContext()
+                    ClipboardMonitor.setEnabled(context, enabled)
+                    if (enabled && !ClipboardMonitor.isAccessibilityEnabled(context)) {
+                        ClipboardMonitor.openAccessibilitySettings(context)
+                    }
+                    ClipboardMonitor.status(context)
+                }
+
+                "clipboard.openSettings" -> {
+                    requirePermission("clipboard")
+                    ClipboardMonitor.openAccessibilitySettings(hostContext())
+                    true
+                }
+
+                "clipboard.sync" -> {
+                    requirePermission("clipboard")
+                    io.execute {
+                        runCatching { syncClipboard() }
+                            .onSuccess { resolve(id, true, it, null) }
+                            .onFailure { e ->
+                                if (e is BridgeException) {
+                                    resolve(id, false, null, e)
+                                } else {
+                                    resolve(
+                                        id, false, null,
+                                        BridgeException("E_NETWORK", e.message ?: "同步失败")
+                                    )
+                                }
+                            }
+                    }
                 }
 
                 "file.pick" -> {
@@ -738,6 +860,69 @@ class PocketBridge(
     }
 
     // ---------------------------------------------------------------- 互传
+
+    /** 从电脑端拉取剪贴板历史，合并进本地列表。 */
+    private fun syncClipboard(): JSONObject {
+        val context = hostContext()
+        val peers = TransferDiscovery.list().filter { it.platform != "android" }
+        if (peers.isEmpty()) {
+            throw BridgeException("E_NOT_FOUND", "没有发现电脑，确认电脑端已启动且在同一 Wi-Fi")
+        }
+        var lastError: String? = null
+        for (peer in peers) {
+            try {
+                val text = httpGet("http://${peer.host}:${peer.port}/api/clipboard")
+                val json = JSONObject(text)
+                val array = json.optJSONArray("items") ?: JSONArray()
+                val incoming = mutableListOf<ClipboardEntry>()
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+                    val content = item.optString("text")
+                    if (content.isBlank()) continue
+                    incoming.add(
+                        ClipboardEntry(
+                            id = item.optString("id"),
+                            text = content,
+                            time = item.optLong("time", 0L).takeIf { it > 0 }
+                                ?: System.currentTimeMillis(),
+                            source = "pc"
+                        )
+                    )
+                }
+                val added = ClipboardStore.merge(context, incoming)
+                val total = ClipboardStore.list(context).size
+                TransferEvents.emit(
+                    "clipboard.changed",
+                    JSONObject().put("synced", added).put("total", total)
+                )
+                return JSONObject()
+                    .put("ok", true)
+                    .put("added", added)
+                    .put("total", total)
+                    .put("peer", peer.name)
+            } catch (e: Throwable) {
+                lastError = e.message
+            }
+        }
+        throw BridgeException("E_NETWORK", "连接电脑失败：${lastError ?: "未知错误"}")
+    }
+
+    private fun httpGet(url: String): String {
+        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 4_000
+            readTimeout = 8_000
+        }
+        return try {
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) throw IllegalStateException("HTTP $code")
+            text
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     private fun emitTransferEvent(name: String, payload: JSONObject) {
         val script = "window.__pocketEvent && window.__pocketEvent(" +

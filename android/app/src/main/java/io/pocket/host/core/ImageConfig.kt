@@ -33,6 +33,15 @@ object ImageConfig {
     val QUALITIES = listOf("auto", "low", "medium", "high")
     val FORMATS = listOf("png", "jpeg", "webp")
 
+    private fun normalizeSize(size: String): String {
+        val value = size.trim().lowercase()
+        if (value in SIZES) return value
+        val match = Regex("^(\\d{2,4})x(\\d{2,4})$").matchEntire(value) ?: return "auto"
+        val w = match.groupValues[1].toIntOrNull() ?: return "auto"
+        val h = match.groupValues[2].toIntOrNull() ?: return "auto"
+        return if (w in 64..4096 && h in 64..4096) "${w}x${h}" else "auto"
+    }
+
     data class Settings(val baseUrl: String, val key: String, val model: String) {
         fun ready(): Boolean = baseUrl.isNotBlank() && key.isNotBlank() && model.isNotBlank()
         fun summary(): String = if (!ready()) "未配置" else "$model · ${hostOf(baseUrl)}"
@@ -79,7 +88,7 @@ object ImageConfig {
         if (!cfg.ready()) throw ImageException("还没有配置生图模型，去 设置 → 生图模型 填一下")
 
         val n = count.coerceIn(1, 4)
-        val realSize = if (size in SIZES) size else "auto"
+        val realSize = normalizeSize(size)
         val realQuality = if (quality in QUALITIES) quality else "auto"
         val realFormat = if (outputFormat in FORMATS) outputFormat else "png"
 

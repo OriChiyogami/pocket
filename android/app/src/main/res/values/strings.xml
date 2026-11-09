@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">口袋</string>
+    <string name="accessibility_desc">用于识别你在其他应用里的复制动作，并把刚复制的文字同步到同一 Wi-Fi 下的电脑。只处理文字内容，不记录屏幕画面。</string>
+    <string name="clipboard_service_label">口袋剪贴板</string>
 </resources>
